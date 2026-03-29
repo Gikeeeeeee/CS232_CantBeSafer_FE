@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { loginService } from '@/src/services/loginService';
 import { setCookie } from 'cookies-next';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const LoginPage: React.FC = () => { // ลบ async ออกจากตรงนี้
   const router = useRouter();
@@ -89,12 +90,14 @@ const LoginPage: React.FC = () => { // ลบ async ออกจากตรง�
               {isLoading ? 'Checking...' : 'Login'}
             </button>
             
-            <button
-              type="button"
-              className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium py-3 rounded-lg transition-all shadow-sm"
-            >
-              Sign up
-            </button>
+            <Link href="/signup">
+              <button
+                type="button"
+                className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium py-3 rounded-lg transition-all shadow-sm"
+              >
+                Sign up
+              </button>
+            </Link>
           </div>
 
           <div className="text-center mt-6">
