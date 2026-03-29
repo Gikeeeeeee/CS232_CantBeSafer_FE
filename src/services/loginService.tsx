@@ -1,4 +1,4 @@
-// import api
+import api from "../lib/axios";
 
 interface LoginPayload {
     username: string;
@@ -6,7 +6,7 @@ interface LoginPayload {
 }
 
 export const loginService = {
-    // postLogin: (data: LoginPayload) => {
-    //     return apiClient.post('/auth/login', data);
-    // }
+    postLogin: (data: LoginPayload) => {
+        return api.post('/auth/login', data);
+    }
 }
