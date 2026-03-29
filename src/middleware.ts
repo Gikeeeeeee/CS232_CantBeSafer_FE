@@ -1,27 +1,31 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import axios from 'axios';
+import { getCookie } from 'cookies-next';
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('auth-token')?.value;
-  const role = request.cookies.get('user-role')?.value;
-  const { pathname } = request.nextUrl;
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+});
 
-  // 1. ถ้าไม่มี Token ห้ามเข้าหน้าระบบ
-  if (!token && (pathname.startsWith('/admin') || pathname.startsWith('/user'))) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+// ส่ง Token ติดไปด้วยทุกครั้งที่ยิง API
+api.interceptors.request.use((config) => {
+  const token = getCookie('auth-token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
+  return config;
+});
 
-  // 2. ป้องกันข้าม Role
-  if (role === 'admin' && pathname.startsWith('/user')) {
-    return NextResponse.redirect(new URL('/admin', request.url));
+// ดักจับถ้า Token หมดอายุ (401) ให้ดีดไปหน้า Login
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
+    }
+    return Promise.reject(err);
   }
-  if (role === 'user' && pathname.startsWith('/admin')) {
-    return NextResponse.redirect(new URL('/user', request.url));
-  }
+);
 
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: ['/admin/:path*', '/user/:path*'],
-};
+// บรรทัดนี้แหละที่ loginService.tsx ของเพื่อนตามหา!
+export default api;
