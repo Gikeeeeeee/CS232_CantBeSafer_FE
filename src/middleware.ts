@@ -1,31 +1,30 @@
-import axios from 'axios';
-import { getCookie } from 'cookies-next';
+// src/middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
-});
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get('auth-token')?.value;
+  const { pathname } = request.nextUrl;
 
-// ส่ง Token ติดไปด้วยทุกครั้งที่ยิง API
-api.interceptors.request.use((config) => {
-  const token = getCookie('auth-token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // ป้องกันการวนลูป: ปล่อยให้เข้าถึงไฟล์ระบบและหน้า Login ได้เสมอ
+  if (
+    pathname.startsWith('/_next') || 
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/auth') || // ปล่อยให้หน้า login/signup เข้าได้
+    pathname === '/'
+  ) {
+    return NextResponse.next();
   }
-  return config;
-});
 
-// ดักจับถ้า Token หมดอายุ (401) ให้ดีดไปหน้า Login
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
-      }
-    }
-    return Promise.reject(err);
+  // ถ้าไม่มี Token แต่จะเข้าหน้า admin หรือ user ให้ดีดไปหน้า login
+  if (!token && (pathname.startsWith('/admin') || pathname.startsWith('/user'))) {
+    return NextResponse.redirect(new URL('/auth/login', request.url));
   }
-);
 
-// บรรทัดนี้แหละที่ loginService.tsx ของเพื่อนตามหา!
-export default api;
+  return NextResponse.next();
+}
+
+export const config = {
+  // ตรวจสอบทุกหน้ายกเว้นไฟล์ static
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+};

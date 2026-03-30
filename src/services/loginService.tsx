@@ -1,8 +1,8 @@
 import api from "../lib/axios";
 
-interface LoginPayload {
-    username: string;
-    password?: string;
+export interface LoginPayload {
+    Username: string;
+    Password?: string;
 }
 
 export const loginService = {

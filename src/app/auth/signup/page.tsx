@@ -1,136 +1,187 @@
 "use client";
 
-import React, { useState } from 'react';
-import { loginService } from '@/services/loginService';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { AxiosError } from 'axios';
-import { useAuthStore } from '@/lib/auth-store';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { signupService } from "@/services/signupService";
+import { useRouter } from "next/navigation"; 
 
-const LoginPage: React.FC = () => {
-  const router = useRouter();
-  const login = useAuthStore((state) => state.login);
-  
-  const [username, setUsername] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+export default function SignupPage() {
+  const router = useRouter(); 
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const [errors, setErrors] = useState({
+    passwordCriteria: false,
+    passwordMismatch: false,
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); 
+
+  const validatePassword = (pass: string) => {
+    const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*_\-]).{12,}$/;
+    return regex.test(pass);
+  };
+
+  useEffect(() => {
+    const isPasswordInputted = formData.password.length > 0;
+    const isNotValid = !validatePassword(formData.password);
+
+    setErrors((prev) => ({
+      ...prev,
+      passwordCriteria: isPasswordInputted && isNotValid,
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      passwordMismatch: formData.confirmPassword.length > 0 && formData.password !== formData.confirmPassword,
+    }));
+  }, [formData.password, formData.confirmPassword]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-    
-    try {
-      const payload = { username, password };
-      const response = await loginService.postLogin(payload);
-      
-      const token = response.data.token;
-      
-      if (token) {
-        // กรณีที่ API ของเพื่อนยังไม่ได้ส่งข้อมูล User กลับมาครบตาม Type ที่เรากำหนดไว้
-        // เราจะสร้าง Mock Data ขึ้นมาใช้งานชั่วคราวเพื่อให้ระบบ State ทำงานได้
-        const user = response.data.user || {
-          user_id: 1,
-          name: username,
-          dome_mail: `${username}@dome.tu.ac.th`,
-          role: 'user', 
-          is_active: true,
-          department_id: 1
-        };
+    if (errors.passwordCriteria || errors.passwordMismatch) return;
 
-        // เรียกใช้งาน Store เพื่อเก็บ Token ลง Cookie และเก็บข้อมูล User ลง LocalStorage
-        login(user, token);
-        
-        router.push('/dashboard'); 
-      }
+    setIsLoading(true);
+    try {
+      await signupService({
+        Username: formData.username,
+        Password: formData.password,
+        Confirm_pass: formData.confirmPassword,
+        Email: formData.email,
+      });
+      
+      // ✅ เปลี่ยนแค่ State ให้เป็น true ส่วนหน่วงเวลา (setTimeout) เอาออกไปแล้ว
+      setIsSuccess(true); 
+
     } catch (err) {
-      if (err instanceof AxiosError) {
-        setError(err.response?.data?.message || 'Invalid username or password');
-        console.error('Login Failed:', err.response?.data);
-      } else {
-        setError('Something went wrong. Please try again.');
-        console.error('Unknown Error:', err);
-      }
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      alert(errorMsg || "Something went wrong"); 
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#FFFFFF] flex items-center justify-center p-6">
-      
-      {/* Card */}
-      <div className="w-full max-w-[400px] bg-white rounded-xl shadow-none md:shadow-2xl p-10 md:p-12 transition-all">
-        
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">Login</h1>
-          {/* Error Message */}
-          {error && (
-            <p className="text-red-500 text-[13px] mt-2 font-medium">
-              {error}
-            </p>
-          )}
+  // ✅ หน้าจอ Success (รอผู้ใช้กดปุ่มด้วยตัวเอง)
+  if (isSuccess) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white p-4">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[#e8fbf0]">
+            <svg className="h-12 w-12 text-[#00E676]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900">Success!</h2>
+          <p className="text-gray-500 mt-2">
+            Your account has been created successfully.
+          </p>
+          <div className="pt-6">
+            <button
+              onClick={() => router.push("/auth/login")}
+              // ปรับปุ่มให้เป็นสีเขียวเด่นชัด เพื่อให้รู้ว่าต้องกดตรงนี้เพื่อไปต่อ
+              className="w-full rounded-lg bg-[#00E676] px-6 py-3 font-semibold text-gray-900 transition-all hover:bg-[#00c864] shadow-sm"
+            >
+              Go to Login
+            </button>
+          </div>
         </div>
+      </div>
+    );
+  }
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {/* Username */}
-          <div className="space-y-2">
-            <label className="text-[14px] font-bold text-gray-800">Username</label>
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white p-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-8">
+        <h1 className="text-center text-2xl font-bold text-gray-900">Create an account</h1>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[14px] font-medium text-gray-900">Username</label>
             <input
+              name="username"
               type="text"
               placeholder="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none text-gray-600 bg-white shadow-sm"
-              disabled={isLoading}
               required
+              className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:ring-1 focus:ring-emerald-400"
+              onChange={handleChange}
             />
           </div>
 
-          {/* Password */}
-          <div className="space-y-2">
-            <label className="text-[14px] font-bold text-gray-800">Password</label>
+          <div>
+            <label className="block text-[14px] font-medium text-gray-900">Email</label>
             <input
-              type="password"
-              placeholder="**********"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none text-gray-600 bg-white shadow-sm"
-              disabled={isLoading}
+              name="email"
+              type="email"
+              placeholder="example@gmail.com"
               required
+              className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:ring-1 focus:ring-emerald-400"
+              onChange={handleChange}
             />
           </div>
 
-          {/* Buttons */}
-          <div className="pt-4 space-y-3">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-[#00e676] hover:bg-[#00c853] text-gray-800 font-bold py-3 rounded-lg transition-all active:scale-[0.98] shadow-md"
-            >
-              {isLoading ? 'Checking...' : 'Login'}
-            </button>
-            
-            <Link href="/signup">
-              <button
-                type="button"
-                className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium py-3 rounded-lg transition-all shadow-sm"
-              >
-                Sign up
-              </button>
-            </Link>
+          <div>
+            <label className="block text-[14px] font-medium text-gray-900">New Password</label>
+            <input
+                name="password"
+                type="password"
+                placeholder="••••••••••"
+                required
+                className={`mt-1 w-full rounded-xl border p-3 outline-none transition-colors text-gray-900 placeholder:text-gray-400 ${
+                    errors.passwordCriteria ? "border-red-500" : "border-gray-200"
+                }`}
+                onChange={handleChange}
+            />
+            <p className={`mt-2 text-[12px] leading-tight ${errors.passwordCriteria ? "text-red-500" : "text-[#94a3b8]"}`}>
+              Password must be at least 12 characters, including uppercase letters, numbers, and at least one special character.
+            </p>
           </div>
 
-          <div className="text-center mt-6">
-            <a href="#" className="text-sm text-gray-600 hover:underline">
-              Forgot your password?
-            </a>
+          <div>
+          <label className="block text-[14px] font-medium text-gray-900">Confirm Password</label>
+          <input
+              name="confirmPassword"
+              type="password"
+              placeholder="••••••••••"
+              required
+              
+              className={`mt-1 w-full rounded-xl border p-3 outline-none transition-colors text-gray-900 placeholder:text-gray-400 ${
+              errors.passwordMismatch 
+                  ? "border-red-500 ring-1 ring-red-500" 
+                  : "border-gray-200 focus:border-emerald-400"
+              }`}
+              onChange={handleChange}
+          />
+          {errors.passwordMismatch && (
+              <p className="mt-1 text-[12px] font-semibold text-red-500">password mismatch</p>
+          )}
           </div>
-        </form>
-      </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#00E676] py-3 font-semibold text-gray-900 transition-all hover:bg-[#00c864] disabled:opacity-50"
+          >
+            {isLoading ? "Loading..." : "Create Account"} <span className="text-xl">→</span>
+          </button>
+
+          <p className="text-center text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link href="/auth/login" className="font-medium hover:underline">
+              Login
+            </Link>
+          </p>
+        </div>
+      </form>
     </div>
   );
-};
-
-export default LoginPage;
+}
