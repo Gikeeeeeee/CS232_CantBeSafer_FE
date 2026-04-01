@@ -5,6 +5,7 @@ import { loginService } from '@/services/loginService';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/auth-store';
+import Button from '@/components/Button';
 
 const LoginPage: React.FC = () => {
   const router = useRouter();
@@ -26,42 +27,38 @@ const LoginPage: React.FC = () => {
       
       const { token, role, user } = response.data; 
 
-    if (token && role) {
-          console.log("1. ได้ Token กับ Role มาแล้ว:", { token, role });
-          
-          const userData = { user_id: 0, name: Username, role: role, dome_mail: '', is_active: true };
-          login(userData, token);
-          
-          console.log("2. เก็บข้อมูลลง Store/Cookie สำเร็จ");
+      if (token && role) {
+        // --- 1. ต้องมีก้อนนี้ เพื่อไม่ให้ TypeScript ด่าว่า userData ไม่มีอยู่จริง ---
+        const userData = user || { 
+          user_id: 0, 
+          name: Username, 
+          role: role, 
+          dome_mail: '', 
+          is_active: true 
+        };
+        
+        login(userData, token);
 
-          if (role === 'admin') {
-            console.log("3. กำลังจะไปหน้า Admin...");
-            router.push('/admin/dashboard'); 
-          } else {
-            console.log("3. กำลังจะไปหน้า User...");
-            router.push('/user/profile');
-          }
+        if (role === 'admin') {
+          router.push('/admin/dashboard');
+        } else {
+          // เช็ค Path ให้ตรงกับ Folder ในรูปของคุณ คือ /user/profile
+          router.push('/user/profile'); 
         }
-      } catch (err: any) {
-        // ดึง Error Message จาก Backend มาแสดง
-        setError(err.response?.data?.message || 'Invalid username or password');
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Invalid username or password');
+    } finally {
+      setIsLoading(false);
+    }
+  }; // ปิด handleLogin
 
   return (
     <div className="min-h-screen bg-[#FFFFFF] flex items-center justify-center p-6">
-      
-      <div className="w-full max-w-[400px] bg-white rounded-xl shadow-none md:shadow-2xl p-10 md:p-12 transition-all">
-        
+      <div className="w-full max-w-[400px] bg-white rounded-xl shadow-none md:shadow-2xl p-10 md:p-12">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-800">Login</h1>
-          {error && (
-            <p className="text-red-500 text-[13px] mt-2 font-medium">
-              {error}
-            </p>
-          )}
+          {error && <p className="text-red-500 text-[13px] mt-2 font-medium">{error}</p>}
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -72,7 +69,7 @@ const LoginPage: React.FC = () => {
               placeholder="username"
               value={Username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none text-gray-600 bg-white shadow-sm"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-black bg-white"
               disabled={isLoading}
               required
             />
@@ -85,35 +82,23 @@ const LoginPage: React.FC = () => {
               placeholder="**********"
               value={Password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:outline-none text-gray-600 bg-white shadow-sm"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-black bg-white"
               disabled={isLoading}
               required
             />
           </div>
 
           <div className="pt-4 space-y-3">
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#00e676] hover:bg-[#00c853] text-gray-800 font-bold py-3 rounded-lg transition-all active:scale-[0.98] shadow-md disabled:opacity-50"
+              className="space-y-6"
             >
               {isLoading ? 'Checking...' : 'Login'}
-            </button>
-            
-            <Link href="/auth/signup">
-              <button
-                type="button"
-                className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium py-3 rounded-lg transition-all shadow-sm"
-              >
+            </Button>
+            <Link href="/auth/signup" className="block text-center w-full bg-white border border-gray-200 text-gray-800 font-medium py-3 rounded-lg">
                 Sign up
-              </button>
             </Link>
-          </div>
-
-          <div className="text-center mt-6">
-            <a href="#" className="text-sm text-gray-600 hover:underline">
-              Forgot your password?
-            </a>
           </div>
         </form>
       </div>
