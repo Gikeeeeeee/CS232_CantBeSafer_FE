@@ -18,8 +18,8 @@ export const useAuthStore = create<AuthState & AuthAction>()(
       // ปรับปรุง Login: ให้เก็บทั้งใน Store และ Cookie
       login: (user, token) => {
         // 1. เก็บใน Cookie เพื่อให้ Middleware อ่านได้ (ฝั่ง Server)
-        setCookie('auth-token', token, { maxAge: 60 * 60 * 24 }); // เก็บไว้ 1 วัน
-        setCookie('user-role', user.role, { maxAge: 60 * 60 * 24 });
+        setCookie('auth-token', token, { maxAge: 60 * 60 * 24, path: '/' });
+        setCookie('user-role', user.role, { maxAge: 60 * 60 * 24, path: '/' });
 
         // 2. เก็บใน Zustand Store (ฝั่ง Client)
         set({ user, token, isAuthenticated: true });

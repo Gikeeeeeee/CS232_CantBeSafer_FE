@@ -7,6 +7,8 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
+  console.log(`[Middleware] Path: ${pathname} | Has Token: ${!!token}`);
+
   // 2. กำหนด Path ที่เราอนุญาตให้เข้าได้โดยไม่ต้อง Login (Public Routes)
   const isAuthPage = pathname.startsWith('/auth'); // เช่น /auth/login, /auth/register
   const isPublicPage = pathname === '/'; // หน้าแรก (ถ้าอยากให้คนนอกดูได้)
@@ -52,7 +54,8 @@ export function middleware(request: NextRequest) {
     }
     // ถ้าเป็น User แต่พยายามเข้าหน้า /admin
     if (pathname.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL('/user/home', request.url));
+      // เปลี่ยนจาก /user/home เป็นหน้าที่มีอยู่จริง (เช่น /user/profile)
+      return NextResponse.redirect(new URL('/user/profile', request.url)); 
     }
   }
 

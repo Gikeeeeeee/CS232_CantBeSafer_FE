@@ -19,14 +19,14 @@ export default function SignupPage() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // ตรวจสอบเงื่อนไขรหัสผ่าน (12 ตัว, ใหญ่, เลข, พิเศษ)
+  // ตรวจสอบเงื่อนไขรหัสผ่าน (4 ตัว, ใหญ่, เลข, พิเศษ)
   const validatePassword = (pass: string) => {
-    const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{12,}$/;
+    const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[_!@#$%^&*])[A-Za-z\d_!@#$%^&*]{4,}$/;
     return regex.test(pass);
   };
 
 useEffect(() => {
-  // เงื่อนไข: ถ้าช่องว่างอยู่ไม่ต้องแดง แต่ถ้าเริ่มพิมพ์แล้วไม่ครบเกณฑ์ 12 ตัว/ใหญ่/เลข/พิเศษ ถึงจะแดง
+  // เงื่อนไข: ถ้าช่องว่างอยู่ไม่ต้องแดง แต่ถ้าเริ่มพิมพ์แล้วไม่ครบเกณฑ์ 4 ตัว/ใหญ่/เลข/พิเศษ ถึงจะแดง
   const isPasswordInputted = formData.password.length > 0;
   const isNotValid = !validatePassword(formData.password);
 
