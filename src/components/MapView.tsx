@@ -6,17 +6,13 @@ import L from "leaflet";
 import { getIncidentMarkers } from "@/services/reportService";
 
 const MapView = () => {
-  const [isMounted, setIsMounted] = useState(false); // เช็คว่า Component พร้อมทำงานหรือยัง
   const [markers, setMarkers] = useState<any[]>([]);
 
   useEffect(() => {
-    // 1. บอกว่า Component ติดตั้งเสร็จแล้ว
-    setIsMounted(true);
-    
-    // 2. โหลด CSS ของ Leaflet
+    // 1. โหลด CSS ของ Leaflet
     import("leaflet/dist/leaflet.css");
 
-    // 3. ดึงข้อมูล
+    // 2. ดึงข้อมูล
     const fetchData = async () => {
       try {
         const data = await getIncidentMarkers();
@@ -26,9 +22,6 @@ const MapView = () => {
       }
     };
     fetchData();
-
-    // Cleanup: เมื่อ Component ถูกถอนออก ให้ตั้งเป็น false
-    return () => setIsMounted(false);
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -49,17 +42,9 @@ const MapView = () => {
     });
   };
 
-  // 4. ถ้ายังไม่ Mounted หรือกำลังโหลด ให้โชว์ Loading (ป้องกัน appendChild error)
-  if (!isMounted) return (
-    <div className="w-full h-full bg-blue-50 flex items-center justify-center">
-      <p>Loading Map...</p>
-    </div>
-  );
-
   return (
-    <div className="w-full h-full relative"> {/* ใส่ div หุ้มเพื่อความชัวร์ */}
+    <div className="w-full h-full relative">
       <MapContainer
-        key={isMounted ? "map-ready" : "map-loading"} // ใช้ Key เพื่อบังคับให้ Render ใหม่ครั้งเดียว
         center={[14.0700, 100.6050]}
         zoom={16}
         style={{ width: "100%", height: "100%" }}
