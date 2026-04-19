@@ -53,7 +53,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
     // ถ้าเป็น User แต่พยายามเข้าหน้า /admin
-    if (pathname.startsWith('/admin') && role !== 'admin') {
+    if (pathname.startsWith('/admin') && role !== 'admin' && role !== 'dev') {
       // เปลี่ยนจาก /user/home เป็นหน้าที่มีอยู่จริง (เช่น /user/profile)
       return NextResponse.redirect(new URL('/user/profile', request.url)); 
     }
