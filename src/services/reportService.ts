@@ -4,8 +4,8 @@ export interface IncidentMarker {
   id: number;
   title: string;
   description: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | string; // เผื่อกรณี DB ส่งมาเป็น string
+  longitude: number | string;
   urgency_score: number;
   image_url: string;
   status: string;
@@ -13,46 +13,22 @@ export interface IncidentMarker {
 }
 
 export const getIncidentMarkers = async (): Promise<IncidentMarker[]> => {
-  // --- ส่วนที่ 1: Mock Data (ข้อมูลจำลอง) ---
-  // ถ้านายอยากเพิ่มหมุด ให้ก๊อปปี้ก้อน {} นี้ไปวางเพิ่มแล้วแก้พิกัดเอาครับ
-  const mockData: IncidentMarker[] = [
-    {
-      id: 1,
-      title: "อุบัติเหตุรถชน",
-      description: "มีรถชนกันหน้าประตูเชียงราก 1",
-      latitude: 14.0738, 
-      longitude: 100.6062,
-      urgency_score: 5,
-      image_url: "https://via.placeholder.com/150",
-      status: "EMERGENCY",
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 2,
-      title: "น้ำท่วมขัง",
-      description: "ทางเดินเท้าหน้าหอพักมีน้ำท่วม",
-      latitude: 14.0755,
-      longitude: 100.6080,
-      urgency_score: 2,
-      image_url: "https://via.placeholder.com/150",
-      status: "NORMAL",
-      created_at: new Date().toISOString()
-    }
-  ];
-
   try {
-    // --- ส่วนที่ 2: ปิดการดึงข้อมูลจริงไว้ก่อน ---
-    /*
-    const response = await api.get("/api/reports/all");
-    return response.data.data || [];
-    */
+    // 1. เรียกไปที่ Endpoint ใหม่ของ Backend
+    // (สมมติว่า base URL ของ api คือ http://localhost:3000 แล้ว)
+    const response = await api.get("/api/reports/active-map");
 
-    // คืนค่าข้อมูลจำลองออกไปแทน
-    console.log("⚠️ Using Mock Data because Backend is broken");
-    return mockData;
+    // 2. โครงสร้างที่ได้มาคือ { success: true, count: 10, data: [...] }
+    // ดังนั้นเราต้องเข้าถึง response.data.data
+    if (response.data && response.data.success) {
+        console.log("✅ Fetched markers successfully:", response.data.count);
+        return response.data.data;
+    }
+    
+    return [];
 
   } catch (error: any) {
-    console.error("❌ Error fetching markers:", error.message);
-    return mockData; // ถ้าพังก็ยังให้ส่ง Mock Data ออกไป
+    console.error("❌ Error fetching markers:", error.response?.data || error.message);
+    return []; // คืนค่า array ว่างถ้าดึงข้อมูลไม่สำเร็จ แผนที่จะได้ไม่พัง
   }
 };
