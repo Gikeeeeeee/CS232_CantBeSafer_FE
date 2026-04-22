@@ -17,31 +17,22 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
     try {
       const payload = { username: Username, password: Password };
+      // 🚀 ยิง API จริง
       const response = await loginService.postLogin(payload);
-      const { token } = response.data;
-
-      console.log("Sending Payload:", payload);
+      
+      // ดึง token ตามโครงสร้าง response.data.token
+      const token = response.data?.token;
 
       if (token) {
-        console.log("1. Token received");
-        
         const decoded: any = jwtDecode(token);
-        // ดึง Role จากที่ต่างๆ ตามที่คุณดักไว้
         const userRole = decoded.role || decoded.Role || response.data.user?.role || 'user';
-
-        // --- จุดที่ต้องเพิ่ม: เซ็ต Cookie ให้ Middleware เห็น ---
-        // เราเซ็ตผ่าน document.cookie (หรือใช้ library cookies-next ก็ได้)
-        // ต้องตั้งชื่อให้ตรงกับ Middleware คือ 'auth-token' และ 'user-role'
-        const cookieOptions = "path=/; max-age=86400; SameSite=Lax"; // 1 วัน
-        document.cookie = `auth-token=${token}; ${cookieOptions}`;
-        document.cookie = `user-role=${userRole}; ${cookieOptions}`;
 
         const userData = {
           user_id: decoded.id || 0,
@@ -51,29 +42,20 @@ const handleLogin = async (e: React.FormEvent) => {
           is_active: true
         };
 
-        console.log("2. Data prepared, calling login store");
-        login(userData, token); // เซ็ตลง Zustand สำหรับใช้ใน UI
+        // 🎯 สั่ง Store เก็บลง Cookie และ LocalStorage (Zustand จัดการให้)
+        login(userData, token); 
 
-        console.log("3. Redirecting to:", userRole);
-
-        // ใช้ window.location.href เพื่อให้ Middleware ทำงานใหม่ทั้งหมดจากการ Hard Refresh
+        // Hard Refresh เพื่อให้ Middleware ทำงานใหม่
         if (userRole === 'admin') {
           window.location.href = '/admin/dashboard';
         } else {
-          window.location.href = '/user/profile';
+          window.location.href = '/user/home';
         }
       } else {
-        setError("No token received from server");
+        setError("ไม่ได้รับ Token จากเซิร์ฟเวอร์");
       }
     } catch (err: any) {
-      console.error("Login Error Detailed:", err);
-      
-      // ปรับการแสดง Error ให้สื่อสารกับเราง่ายขึ้น
-      if (err.response?.status === 500) {
-        setError("Backend DB Error (500) - ลองใช้ User: admin / Pass: 1234 (Mock)");
-      } else {
-        setError(err.response?.data?.message || 'การเชื่อมต่อล้มเหลว');
-      }
+      setError(err.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     } finally {
       setIsLoading(false);
     }
@@ -115,11 +97,7 @@ const handleLogin = async (e: React.FormEvent) => {
           </div>
 
           <div className="pt-4 space-y-3">
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="space-y-6"
-            >
+            <Button type="submit" disabled={isLoading} className="space-y-6">
               {isLoading ? 'Checking...' : 'Login'}
             </Button>
             <Link href="/auth/signup" className="block text-center w-full bg-white border border-gray-200 text-gray-800 font-medium py-3 rounded-lg">
