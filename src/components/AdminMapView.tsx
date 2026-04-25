@@ -3,14 +3,18 @@
 import React, { useState, useEffect } from "react";
 import { MapContainer, TileLayer, CircleMarker, Circle } from "react-leaflet";
 
+// 1. ปรับ Type ให้ตรงกับ JSON จาก Backend
 type Report = {
-  id: number;
-  lat: number;
-  lng: number;
-  location: string;
-  description: string;
-  image: null;
-  status: string;
+  report_id: number;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  location_name: string;
+  report_description: string;
+  evidence_url: string | null;
+  report_status: string;
+  urgency_score: number;
 };
 
 type AdminMapViewProps = {
@@ -18,11 +22,15 @@ type AdminMapViewProps = {
   onMarkerClick?: (report: Report) => void;
 };
 
-const getStatusColor = (status: string) => {
-  if (status === "Emergency") return "#9333ea";
-  if (status === "Urgent") return "#ff3b3b";
-  if (status === "Normal") return "#ffb800";
-  if (status === "Resolved") return "#2563eb";
+// 2. ปรับ Logic การดึงสีตาม report_status จริงในระบบ
+const getStatusColor = (status: string, urgency_score: number) => {
+  if (status === "reported") return "#1a1a1a";   // ดำ = ยังไม่อนุมัติ
+  if (status === "resolved") return "#2563eb";   // น้ำเงิน = resolved
+  if (status === "in_progress") {
+    if (urgency_score === 3) return "#9333ea";   // ม่วง = Emergency
+    if (urgency_score === 2) return "#ff3b3b";   // แดง = Urgent
+    return "#ffb800";                            // เหลือง = Normal
+  }
   return "#1a1a1a";
 };
 
@@ -31,6 +39,7 @@ const AdminMapView = ({ reports = [], onMarkerClick }: AdminMapViewProps) => {
 
   useEffect(() => {
     setIsMounted(true);
+    // โหลด CSS ของ Leaflet
     import("leaflet/dist/leaflet.css");
     return () => setIsMounted(false);
   }, []);
@@ -45,7 +54,7 @@ const AdminMapView = ({ reports = [], onMarkerClick }: AdminMapViewProps) => {
     <div className="w-full h-full relative">
       <MapContainer
         key={isMounted ? "admin-map-ready" : "admin-map-loading"}
-        center={[14.0700, 100.6050]}
+        center={[14.0700, 100.6050]} // ศูนย์กลาง มธ. รังสิต
         zoom={16}
         style={{ width: "100%", height: "100%" }}
         zoomControl={false}
@@ -56,12 +65,20 @@ const AdminMapView = ({ reports = [], onMarkerClick }: AdminMapViewProps) => {
         />
 
         {reports.map((report) => {
-          const color = getStatusColor(report.status);
+          // ดึงพิกัดจาก object location
+          const lat = report.location?.latitude;
+          const lng = report.location?.longitude;
+          const color = getStatusColor(report.report_status, report.urgency_score);
+
+          // ตรวจสอบว่ามีพิกัดครบถ้วนก่อนวาดบนแผนที่
+          if (lat === undefined || lng === undefined) return null;
+
           return (
-            <React.Fragment key={report.id}>
-              {report.status !== "Resolved" && (
+            <React.Fragment key={report.report_id}>
+              {/* วาดวงรัศมีถ้ายังไม่เสร็จสิ้น */}
+              {report.report_status !== "Resolved" && (
                 <Circle
-                  center={[report.lat, report.lng]}
+                  center={[lat, lng]}
                   radius={80}
                   pathOptions={{
                     color: color,
@@ -71,8 +88,9 @@ const AdminMapView = ({ reports = [], onMarkerClick }: AdminMapViewProps) => {
                   }}
                 />
               )}
+              {/* จุด Marker หลัก */}
               <CircleMarker
-                center={[report.lat, report.lng]}
+                center={[lat, lng]}
                 radius={10}
                 pathOptions={{
                   color: "white",

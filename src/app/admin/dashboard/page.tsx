@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const AdminMapView = dynamic(() => import("@/components/AdminMapView"), {
   ssr: false,
@@ -12,27 +12,63 @@ const AdminMapView = dynamic(() => import("@/components/AdminMapView"), {
   ),
 });
 
-const mockReports = [
-  { id: 1, lat: 14.0700, lng: 100.6050, location: "SC3 Road", description: "เส้นไฟฟ้าขาด", image: null, status: "Unset" },
-  { id: 2, lat: 14.0720, lng: 100.6080, location: "โรงอาหาร", description: "น้ำท่วมบริเวณทางเข้า", image: null, status: "Unset" },
-  { id: 3, lat: 14.0680, lng: 100.6030, location: "หอสมุด", description: "ไฟดับทั้งชั้น 2", image: null, status: "Unset" },
-  { id: 4, lat: 14.0710, lng: 100.6060, location: "SC3 Road .... .... ....", description: "อุบัติเหตุรถชน", image: null, status: "Resolved" },
-];
-
-type Report = typeof mockReports[0];
 type Step = "detail" | "confirm" | "approved";
 
 export default function DashboardPage() {
-  const [reports, setReports] = useState(mockReports);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [reports, setReports] = useState<any[]>([]);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [step, setStep] = useState<Step>("detail");
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
 
-  const handleMarkerClick = (report: Report) => {
+  const API_REPORTS_URL = "http://localhost:5000/api/reports";
+
+  const statusMap: Record<string, { status: string; urgency_score: number }> = {
+    Normal: { status: "in_progress", urgency_score: 1 },
+    Urgent: { status: "in_progress", urgency_score: 2 },
+    Emergency: { status: "in_progress", urgency_score: 3 },
+  };
+
+  const fetchReports = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+
+      const res = await fetch(`${API_REPORTS_URL}/admin-active-map`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache",
+        },
+      });
+
+      const result = await res.json();
+
+      if (result && result.success && Array.isArray(result.data)) {
+        setReports(result.data);
+        setMapKey((prev) => prev + 1);
+      } else if (Array.isArray(result)) {
+        setReports(result);
+        setMapKey((prev) => prev + 1);
+      } else {
+        setReports([]);
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+      setReports([]);
+    }
+  }, [API_REPORTS_URL]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  const handleMarkerClick = (report: any) => {
+    console.log("Full report data:", JSON.stringify(report));
     setSelectedReport(report);
     setSelectedStatus("");
-    setStep(report.status === "Unset" ? "detail" : "approved");
+    setStep(report.report_status === "reported" ? "detail" : "approved");
     setIsOpen(false);
   };
 
@@ -43,25 +79,38 @@ export default function DashboardPage() {
     setIsOpen(false);
   };
 
-  const handleAdd = () => {
-    if (!selectedStatus) return;
-    setStep("confirm");
-  };
+  const handleApprove = async () => {
+    if (!selectedReport || !selectedStatus) return;
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const mapped = statusMap[selectedStatus];
 
-  const handleApprove = () => {
-    if (!selectedReport) return;
-    setReports((prev) =>
-      prev.map((r) =>
-        r.id === selectedReport.id ? { ...r, status: selectedStatus } : r
-      )
-    );
-    handleClose();
-  };
+      const res = await fetch(`${API_REPORTS_URL}/incidents/${selectedReport.report_id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: mapped.status,
+          urgency_score: mapped.urgency_score,
+        }),
+      });
 
-  const handleDeny = () => {
-    if (!selectedReport) return;
-    setReports((prev) => prev.filter((r) => r.id !== selectedReport.id));
-    handleClose();
+      if (res.ok) {
+        alert("อัปเดตสถานะสำเร็จ!");
+        await fetchReports();
+        handleClose();
+      } else {
+        const err = await res.json();
+        alert("Error: " + err.message);
+      }
+    } catch (error) {
+      alert("เกิดข้อผิดพลาด");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -69,6 +118,7 @@ export default function DashboardPage() {
 
       <div className="absolute inset-0 z-0">
         <AdminMapView
+          key={mapKey}
           reports={reports}
           onMarkerClick={handleMarkerClick}
         />
@@ -81,8 +131,8 @@ export default function DashboardPage() {
 
           {step === "detail" && (
             <div className="flex flex-col gap-3">
-              <h2 className="text-xl font-bold text-black">Location : {selectedReport.location}</h2>
-              <p className="text-base text-black">Description: {selectedReport.description}</p>
+              <h2 className="text-xl font-bold text-black">Location : {selectedReport.report_title || "ไม่ระบุ"}</h2>
+              <p className="text-base text-black">Description: {selectedReport.report_description || "ไม่มีรายละเอียด"}</p>
 
               <div className="flex items-center gap-3">
                 <span className="text-base text-black">Status :</span>
@@ -115,8 +165,8 @@ export default function DashboardPage() {
               </div>
 
               <div className="w-full h-32 bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
-                {selectedReport.image ? (
-                  <img src={selectedReport.image} alt="report" className="w-full h-full object-cover" />
+                {selectedReport.evidence_url ? (
+                  <img src={selectedReport.evidence_url} alt="report" className="w-full h-full object-cover" />
                 ) : (
                   <p className="text-gray-400 text-sm">ไม่มีรูปภาพ</p>
                 )}
@@ -124,7 +174,7 @@ export default function DashboardPage() {
 
               <div className="flex justify-center">
                 <button
-                  onClick={handleAdd}
+                  onClick={() => setStep("confirm")}
                   disabled={!selectedStatus}
                   className="bg-green-500 disabled:bg-gray-300 disabled:text-gray-500 text-white font-bold py-2.5 px-10 rounded-full transition-colors"
                 >
@@ -137,16 +187,16 @@ export default function DashboardPage() {
           {step === "confirm" && (
             <div className="flex flex-col gap-2">
               <h2 className="text-xl font-bold text-black text-center mb-1">ยืนยันที่จะเพิ่มระดับ ...</h2>
-              <p className="text-base text-black"><span className="font-semibold">Location:</span> {selectedReport.location}</p>
-              <p className="text-base text-black"><span className="font-semibold">Description:</span> {selectedReport.description}</p>
+              <p className="text-base text-black"><span className="font-semibold">Location:</span> {selectedReport.report_title}</p>
+              <p className="text-base text-black"><span className="font-semibold">Description:</span> {selectedReport.report_description || "ไม่มีรายละเอียด"}</p>
               <p className="text-base text-black mb-2"><span className="font-semibold">Status:</span> {selectedStatus}</p>
 
               <div className="flex gap-3">
-                <button onClick={handleDeny} className="flex-1 bg-red-500 text-white font-bold py-2.5 rounded-full">
-                  Deny
+                <button onClick={() => setStep("detail")} className="flex-1 bg-gray-400 text-white font-bold py-2.5 rounded-full">
+                  Back
                 </button>
-                <button onClick={handleApprove} className="flex-1 bg-green-500 text-white font-bold py-2.5 rounded-full">
-                  Approve
+                <button onClick={handleApprove} disabled={isLoading} className="flex-1 bg-green-500 text-white font-bold py-2.5 rounded-full">
+                  {isLoading ? "Saving..." : "Confirm"}
                 </button>
               </div>
             </div>
@@ -154,11 +204,11 @@ export default function DashboardPage() {
 
           {step === "approved" && (
             <div className="flex flex-col gap-2">
-              <h2 className="text-xl font-bold text-black">Location : {selectedReport.location}</h2>
-              <p className="text-base text-black">Description: {selectedReport.description}</p>
+              <h2 className="text-xl font-bold text-black">Location : {selectedReport.report_title}</h2>
+              <p className="text-base text-black">Description: {selectedReport.report_description || "ไม่มีรายละเอียด"}</p>
               <p className="text-base">
                 <span className="font-semibold text-black">Status : </span>
-                <span className="text-blue-500 font-semibold">{selectedReport.status}</span>
+                <span className="text-blue-500 font-semibold">{selectedReport.report_status}</span>
               </p>
             </div>
           )}
