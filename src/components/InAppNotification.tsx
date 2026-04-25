@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/axios"; 
-
 
 // กำหนด Interface สำหรับข้อมูล Report ที่ได้จาก Backend
 interface IncidentReport {
@@ -13,61 +12,63 @@ interface IncidentReport {
 }
 
 export const InAppNotification = () => {
-  // แก้ปัญหาตัวแดง: ระบุชัดเจนว่าเป็น Set ของ number
-  const [knownReportIds, setKnownReportIds] = useState<Set<number>>(new Set<number>());
   const [latestAlert, setLatestAlert] = useState<IncidentReport | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  const fetchActiveReports = useCallback(async () => {
-    try {
-      // ยิงไปที่ Endpoint ที่เราเช็คจาก Controller ของนาย
-      const response = await api.get("/report/active-map");
-      
-      if (response.data && response.data.success) {
-        const reports: IncidentReport[] = response.data.data;
-        
-        if (reports && reports.length > 0) {
-          // ดึง ID ออกมาและบังคับให้เป็น number เสมอ
-          const currentIds = new Set<number>(reports.map(r => Number(r.report_id)));
-          
-          if (!isInitialLoad) {
-            // หาเหตุการณ์ใหม่ที่ไม่อยู่ใน Set เดิม
-            const newReports = reports.filter(r => !knownReportIds.has(Number(r.report_id)));
-            
-            if (newReports.length > 0) {
-              setLatestAlert(newReports[0]);
-              setIsVisible(true);
-              
-              // ซ่อนแจ้งเตือนหลังจาก 8 วินาที
-              setTimeout(() => {
-                setIsVisible(false);
-              }, 8000);
-            }
-          }
-
-          // อัปเดตรายชื่อ ID ที่เรารู้จักแล้ว
-          setKnownReportIds(currentIds);
-        }
-        setIsInitialLoad(false);
-      }
-    } catch (error) {
-      console.error("In-App Notification Fetch Error:", error);
-    }
-  }, [knownReportIds, isInitialLoad]);
+  
+  // ✅ ใช้ useRef แทน useState เพื่อป้องกัน Infinite Loop
+  const knownReportIds = useRef<Set<number>>(new Set<number>());
+  const isInitialLoad = useRef<boolean>(true);
 
   useEffect(() => {
+    const fetchActiveReports = async () => {
+      try {
+        const response = await api.get("/api/reports/active-map");
+        
+        if (response.data && response.data.success) {
+          const reports: IncidentReport[] = response.data.data;
+          
+          if (reports && reports.length > 0) {
+            const currentIds = new Set<number>(reports.map(r => Number(r.report_id)));
+            
+            if (!isInitialLoad.current) {
+              // เช็คว่ามีเหตุการณ์ใหม่ที่ไม่อยู่ใน Set เดิมไหม
+              const newReports = reports.filter(r => !knownReportIds.current.has(Number(r.report_id)));
+              
+              if (newReports.length > 0) {
+                setLatestAlert(newReports[0]);
+                setIsVisible(true);
+                
+                // ซ่อนแจ้งเตือนหลังจาก 8 วินาที
+                setTimeout(() => {
+                  setIsVisible(false);
+                }, 8000);
+              }
+            }
+
+            // อัปเดตรายชื่อ ID ที่เรารู้จักแล้ว
+            knownReportIds.current = currentIds;
+          }
+          isInitialLoad.current = false;
+        }
+      } catch (error) {
+        console.error("In-App Notification Fetch Error:", error);
+      }
+    };
+
+    // เรียกครั้งแรกทันทีที่เปิดหน้าเว็บ
     fetchActiveReports();
-    // เช็คทุกๆ 10 วินาที
+    
+    // หลังจากนั้นวนลูปทุกๆ 10 วินาที (10000 ms)
     const intervalId = setInterval(fetchActiveReports, 10000);
+    
+    // ล้าง Interval ทิ้งเมื่อสลับไปหน้าอื่น
     return () => clearInterval(intervalId);
-  }, [fetchActiveReports]);
+  }, []); // ✅ วงเล็บว่างๆ แบบนี้คือไม้ตาย! บอก React ว่าให้รันโค้ดก้อนนี้ "แค่ครั้งเดียว" ตอนเปิดหน้า
 
   if (!isVisible || !latestAlert) return null;
 
   return (
     <>
-      {/* ฝัง CSS Animation ไว้ในตัวเลย จะได้ไม่ต้องแก้หลายไฟล์ */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes shrinkBar {
           from { width: 100%; }
