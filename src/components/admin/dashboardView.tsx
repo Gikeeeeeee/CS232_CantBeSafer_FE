@@ -1,9 +1,15 @@
-// src/components/admin/DashboardView.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import dynamic from 'next/dynamic';
 import { IncidentEvent } from '@/types/map';
+
+// [แก้ไข] เพิ่ม onRefresh เข้าไปใน Interface
+interface DashboardViewProps {
+  events: IncidentEvent[];
+  isLoading: boolean;
+  onRefresh?: () => void; // <--- เพิ่มบรรทัดนี้ครับ
+}
 
 const MapComponent = dynamic(() => import('@/components/admin/IncidentMap'), {
   ssr: false,
@@ -21,29 +27,24 @@ const MapComponent = dynamic(() => import('@/components/admin/IncidentMap'), {
   )
 });
 
-const MOCK_INCIDENTS: IncidentEvent[] = [
-  { id: '1', lat: 14.0650, lng: 100.6147, status: 'approved', severity: 3, title: 'เพลิงไหม้ตึก บร.4', type: 'Emergency' },
-  { id: '2', lat: 14.0680, lng: 100.6100, status: 'pending', severity: 0, title: 'พบวัตถุต้องสงสัย หน้า SC', type: 'Unset' },
-  { id: '3', lat: 14.0620, lng: 100.6200, status: 'approved', severity: 2, title: 'อุบัติเหตุรถเฉี่ยวชน', type: 'Urgent' },
-];
-
-export default function DashboardView() {
-  const [incidents, setIncidents] = useState<IncidentEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // จำลองจังหวะดึงข้อมูลจาก DB
-    const timer = setTimeout(() => {
-      setIncidents(MOCK_INCIDENTS);
-      setIsLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, []);
-
+// [แก้ไข] รับ onRefresh มาในฟังก์ชันด้วย
+export default function DashboardView({ events, isLoading, onRefresh }: DashboardViewProps) {
+  
   return (
-    <div className="h-full w-full bg-white">
+    <div className="h-full w-full bg-white relative">
       {!isLoading ? (
-        <MapComponent events={incidents} />
+        <>
+          <MapComponent events={events} />
+          {/* [แถม] ปุ่ม Refresh เล็กๆ บนหน้าจอ เผื่อ Admin อยากกดเอง */}
+          {onRefresh && (
+            <button 
+              onClick={onRefresh}
+              className="absolute top-6 right-6 z-50 bg-white/80 p-2 rounded-md shadow-sm hover:bg-white text-[10px] font-bold text-slate-500 uppercase tracking-wider transition-all"
+            >
+              🔄 Sync Now
+            </button>
+          )}
+        </>
       ) : (
         <div className="flex h-full w-full items-center justify-center">
            <div className="flex flex-col items-center gap-4 animate-pulse">

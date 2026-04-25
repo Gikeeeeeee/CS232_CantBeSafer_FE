@@ -1,12 +1,11 @@
 // src/components/admin/IncidentMap.tsx
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useImperativeHandle, forwardRef } from 'react'; // [เพิ่ม] forwardRef, useImperativeHandle
 import Map, { Marker, NavigationControl, MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { IncidentEvent } from '@/types/map';
 import { User } from '@/types/auth';
-// นำเข้า Icon สไตล์ Minimal จาก lucide-react
 import { Flame, AlertTriangle, Info, HelpCircle, CheckCircle2, Crosshair } from 'lucide-react';
 
 interface MapProps {
@@ -14,16 +13,30 @@ interface MapProps {
   currentUser?: User;
 }
 
-export default function IncidentMap({ events, currentUser }: MapProps) {
+// [แก้ไข] หุ้ม Component ด้วย forwardRef เพื่อให้ข้างนอก (เช่น หน้า Dashboard) สั่งงานเข้ามาได้
+const IncidentMap = forwardRef((props: MapProps, ref) => {
+  const { events, currentUser } = props;
   const mapRef = useRef<MapRef>(null);
   const [adminLocation, setAdminLocation] = useState<{lat: number, lng: number} | null>(null);
-  
-  // State นี้มีไว้รอ Component ของเพื่อน
   const [selectedIncident, setSelectedIncident] = useState<IncidentEvent | null>(null);
-  
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  // Auto-location: ดึงพิกัดเมื่อโหลดเว็บ
+  // =========================================
+  // [ส่วนที่เพิ่มใหม่ 1] ฟังก์ชันสั่งงานจากภายนอก
+  // =========================================
+  useImperativeHandle(ref, () => ({
+    // สั่งให้แผนที่บินไปหาพิกัดที่ต้องการ (ใช้ตอนกดดูแจ้งเตือน)
+    flyToIncident: (lat: number, lng: number) => {
+      mapRef.current?.flyTo({
+        center: [lng, lat],
+        zoom: 17,
+        essential: true,
+        speed: 1.5
+      });
+    }
+  }));
+
+  // Auto-location: ดึงพิกัดเมื่อโหลดเว็บ (โค้ดเดิมของนาย)
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -44,7 +57,6 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
     return events.filter(e => activeFilters.includes(e.type) || (activeFilters.includes('Unset') && e.status === 'pending'));
   }, [events, activeFilters]);
 
-  // ฟังก์ชัน Zoom กลับมาหา Admin
   const refocus = () => {
     if (adminLocation) {
       mapRef.current?.flyTo({ center: [adminLocation.lng, adminLocation.lat], zoom: 16 });
@@ -53,7 +65,6 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
 
   return (
     <div className="w-full h-full relative flex">
-      {/* Map Area เต็มจอ */}
       <div className="flex-1 relative">
         <Map
           ref={mapRef}
@@ -68,18 +79,14 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
               latitude={event.lat}
               onClick={e => {
                 e.originalEvent.stopPropagation();
-                // แค่อัปเดต State ไว้รอ Component ของเพื่อน
                 setSelectedIncident(event);
                 console.log("Clicked Case:", event.id); 
               }}
             >
               <div className="relative cursor-pointer group">
-                {/* วงแหวนกระจายสี (Pulse) เฉพาะเคสฉุกเฉินระดับ 2 ขึ้นไป */}
                 {(event.severity >= 2 && event.status !== 'resolved') && (
                   <div className={`absolute inset-0 rounded-full animate-ping opacity-30 ${event.severity === 3 ? 'bg-red-500' : 'bg-orange-500'}`}></div>
                 )}
-                
-                {/* เปลี่ยนเป็นทรงกลม (rounded-full) พร้อมใส่ Icon */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-transform group-hover:scale-110 ${getSeverityColor(event)}`}>
                   {getSeverityIcon(event)}
                 </div>
@@ -87,7 +94,6 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
             </Marker>
           ))}
 
-          {/* หมุดตำแหน่ง Admin */}
           {adminLocation && (
             <Marker longitude={adminLocation.lng} latitude={adminLocation.lat}>
               <div className="relative flex items-center justify-center">
@@ -98,7 +104,7 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
           )}
         </Map>
 
-        {/* UI Overlay: Filters */}
+        {/* UI Overlay: Filters (โค้ดเดิมของนาย) */}
         <div className="absolute top-6 left-6 flex flex-wrap gap-2 max-w-md">
           {['Emergency', 'Urgent', 'Normal', 'Unset', 'Resolved'].map(label => (
             <button
@@ -121,7 +127,6 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
           )}
         </div>
 
-        {/* Refocus Button (ปุ่มเป้าเล็งกลับมาหาตัวเอง) */}
         <button 
           onClick={refocus}
           className="absolute bottom-10 right-6 w-12 h-12 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-slate-100 flex items-center justify-center text-slate-700 hover:text-blue-600 hover:bg-white transition-all active:scale-95"
@@ -130,47 +135,50 @@ export default function IncidentMap({ events, currentUser }: MapProps) {
         </button>
       </div>
 
-      {/* =========================================
-        พื้นที่สำหรับ Component ของเพื่อนคุณ
-        =========================================
-        รอให้เพื่อนทำเสร็จ แล้วเอามา Import เรียกใช้ตรงนี้ได้เลย 
-        ตัวอย่างการใช้งาน:
-        
-        {selectedIncident && (
-          <CaseDetailSidebar 
-            data={selectedIncident} 
-            onClose={() => setSelectedIncident(null)} 
-          />
-        )}
-      */}
-      
+      {/* [เพิ่ม] แสดง Sidebar รายละเอียดถ้ามีการเลือกหมุด (ทำโครงไว้รอเพื่อน) */}
+      {selectedIncident && (
+         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-white p-4 rounded-xl shadow-2xl border border-slate-200 z-50 flex justify-between items-center animate-in slide-in-from-bottom-5">
+            <div>
+               <h4 className="font-bold text-slate-900 text-sm">Case ID: {selectedIncident.id}</h4>
+               <p className="text-xs text-slate-500 truncate max-w-[200px]">{selectedIncident.type}</p>
+            </div>
+            <button 
+              onClick={() => setSelectedIncident(null)}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800"
+            >
+              CLOSE
+            </button>
+         </div>
+      )}
     </div>
   );
-}
+});
 
-// Helper: จัดการสีพื้นหลัง
+// ตั้งชื่อให้ Component (TypeScript/ESLint แนะนำให้ทำเมื่อใช้ forwardRef)
+IncidentMap.displayName = "IncidentMap";
+
+export default IncidentMap;
+
+// Helper Functions ของนาย (คงเดิมทั้งหมด)
 function getSeverityColor(event: IncidentEvent) {
   if (event.status === 'resolved') return 'bg-blue-600';
   if (event.status === 'pending') return 'bg-slate-800';
   switch(event.severity) {
-    case 3: return 'bg-red-600';     // Emergency
-    case 2: return 'bg-orange-500';  // Urgent
-    case 1: return 'bg-amber-400';   // Normal
+    case 3: return 'bg-red-600';
+    case 2: return 'bg-orange-500';
+    case 1: return 'bg-amber-400';
     default: return 'bg-slate-400';
   }
 }
 
-// Helper: จัดการ Icon ให้ตรงกับประเภท/ความรุนแรง
 function getSeverityIcon(event: IncidentEvent) {
   const iconProps = { size: 14, color: "white", strokeWidth: 3 };
-
   if (event.status === 'resolved') return <CheckCircle2 {...iconProps} />;
   if (event.status === 'pending') return <HelpCircle {...iconProps} />;
-  
   switch(event.severity) {
-    case 3: return <Flame {...iconProps} />;          
-    case 2: return <AlertTriangle {...iconProps} />;  
-    case 1: return <Info {...iconProps} />;           
+    case 3: return <Flame {...iconProps} />;
+    case 2: return <AlertTriangle {...iconProps} />;
+    case 1: return <Info {...iconProps} />;
     default: return <HelpCircle {...iconProps} />;
   }
 }
