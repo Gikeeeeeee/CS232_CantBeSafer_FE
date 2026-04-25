@@ -56,12 +56,14 @@ export default function ReportPage() {
 
       // 1. ส่งข้อมูลรายงาน
       const resData = await submitReport({
-        title: locationName.trim(),
-        description: description.trim(),
-        urgency: 5,
-        latitude: latFromMap,
-        longitude: lngFromMap
-      }, activeToken);
+              title: locationName.trim(),          // ใช้ชื่อสถานที่ตั้งเป็น Title ไปเลย
+              description: description.trim(),
+              urgency: 5,
+              latitude: latFromMap,
+              longitude: lngFromMap,
+              locationName: locationName.trim(),   // 👈 เพิ่มบรรทัดนี้ เพื่อส่งชื่อสถานที่ให้ Backend
+              radius: 10                           // 👈 เพิ่มบรรทัดนี้ (ใส่ค่า Default เป็น 10 หรือค่าที่คุณต้องการ)
+            }, activeToken);
 
       // ดึง ID (ดักทุกรูปแบบที่ Backend มักจะส่งมา)
       const reportId = resData?.report_id || resData?.data?.report_id || resData?.id || resData?.data?.id;

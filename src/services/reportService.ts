@@ -9,6 +9,8 @@ interface ReportData {
   urgency: number;
   latitude: number;
   longitude: number;
+  locationName?: string;
+  radius?: number;
 }
 
 const getAuthHeader = (token?: string) => {
@@ -30,14 +32,15 @@ export const submitReport = async (data: ReportData, token?: string) => {
         "Content-Type": "application/json",
         "Authorization": authHeader,
       },
+      // แก้ไขตรง body ด้านล่างนี้ทั้งหมดครับ
       body: JSON.stringify({
         report_title: data.title,
         report_description: data.description,
         urgency_score: data.urgency,
-        location: {
-          latitude: Number(data.latitude),
-          longitude: Number(data.longitude),
-        },
+        latitude: Number(data.latitude),
+        longitude: Number(data.longitude),
+        location_name: data.locationName || "Unknown Location", // ใส่ค่า fallback เผื่อไว้
+        radius: data.radius || 10 // ใส่ค่าเริ่มต้นเผื่อไม่ได้ส่งมา
       }),
     });
 
