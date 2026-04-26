@@ -4,7 +4,7 @@ export interface IncidentMarker {
   id: number;
   title: string;
   description: string;
-  latitude: number | string; // เผื่อกรณี DB ส่งมาเป็น string
+  latitude: number | string; 
   longitude: number | string;
   urgency_score: number;
   image_url: string;
