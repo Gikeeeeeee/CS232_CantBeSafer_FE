@@ -14,9 +14,15 @@ const MapView = () => {
     const fetchMapData = async () => {
       try {
         const responseData = await fetchActiveIncidentPoints();
-        setReportMarkers(responseData);
+        // 🎯 แก้ไข: ดึงเฉพาะข้อมูลใน data ซึ่งเป็น Array มาใช้งาน
+        if (responseData && Array.isArray(responseData.data)) {
+          setReportMarkers(responseData.data);
+        } else {
+          setReportMarkers([]);
+        }
       } catch (err) {
         console.error("Fetch data error:", err);
+        setReportMarkers([]);
       }
     };
     fetchMapData();
@@ -53,15 +59,19 @@ const MapView = () => {
         />
 
         {reportMarkers.map((markerItem) => {
-          const latitudeNum = parseFloat(markerItem.latitude);
-          const longitudeNum = parseFloat(markerItem.longitude);
+          // 🎯 แก้ไข: ดึงค่าจากโครงสร้างข้อมูลใหม่ (item.location.latitude/longitude)
+          const lat = markerItem.location?.latitude;
+          const lng = markerItem.location?.longitude;
+          
+          const latitudeNum = typeof lat === 'string' ? parseFloat(lat) : lat;
+          const longitudeNum = typeof lng === 'string' ? parseFloat(lng) : lng;
 
           if (isNaN(latitudeNum) || isNaN(longitudeNum)) return null;
 
           const coordinates: [number, number] = [latitudeNum, longitudeNum];
 
           const score = Number(markerItem.urgency_score);
-          const displayColor = getMarkerColor(score, markerItem.status);
+          const displayColor = getMarkerColor(score, markerItem.report_status);
 
           let severityText = "NORMAL";
           let severityClass = "text-amber-500";
@@ -75,7 +85,7 @@ const MapView = () => {
           }
 
           return (
-            <React.Fragment key={markerItem.id}>
+            <React.Fragment key={markerItem.report_id}>
               <Circle
                 center={coordinates}
                 radius={150}
@@ -86,17 +96,17 @@ const MapView = () => {
                   weight: 1
                 }}
               />
-              <Marker position={coordinates} icon={createMapIcon(score, markerItem.status)}>
+              <Marker position={coordinates} icon={createMapIcon(score, markerItem.report_status)}>
                 <Popup>
                   <div className="font-sans text-black min-w-[120px]">
-                    <h3 className="font-bold">{markerItem.title}</h3>
-                    <p className="text-xs">{markerItem.description}</p>
+                    <h3 className="font-bold">{markerItem.report_title}</h3>
+                    <p className="text-xs">{markerItem.report_description}</p>
                     <p className="text-[10px] text-gray-500 mt-1 flex items-center">
                       ความรุนแรงระดับ:
                       <span className={`ml-1 font-bold ${severityClass}`}>
                         {severityText}
                       </span>
-                      {(markerItem.status === 'resolved' || markerItem.status === 'RESOLVED') && (
+                      {(markerItem.report_status === 'resolved' || markerItem.report_status === 'RESOLVED') && (
                         <span className="text-blue-600 font-bold ml-1">(แก้ไขแล้ว)</span>
                       )}
                     </p>

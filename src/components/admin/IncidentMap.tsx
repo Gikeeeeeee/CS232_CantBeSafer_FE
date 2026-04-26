@@ -11,11 +11,12 @@ import { Flame, AlertTriangle, Info, HelpCircle, CheckCircle2, Crosshair } from 
 interface MapProps {
   events: IncidentEvent[];
   currentUser?: User;
+  onMarkerClick?: (event: IncidentEvent) => void; // <--- เพิ่มตัวนี้
 }
 
 // [แก้ไข] หุ้ม Component ด้วย forwardRef เพื่อให้ข้างนอก (เช่น หน้า Dashboard) สั่งงานเข้ามาได้
 const IncidentMap = forwardRef((props: MapProps, ref) => {
-  const { events, currentUser } = props;
+  const { events, currentUser, onMarkerClick } = props;
   const mapRef = useRef<MapRef>(null);
   const [adminLocation, setAdminLocation] = useState<{ lat: number, lng: number } | null>(null);
 
@@ -56,13 +57,25 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
 
   const filteredEvents = useMemo(() => {
     if (activeFilters.length === 0) return events;
-    return events.filter(e => activeFilters.includes(e.type) || (activeFilters.includes('Unset') && e.status === 'pending'));
+    return events.filter(e => {
+      if (activeFilters.includes('Emergency') && e.severity === 3) return true;
+      if (activeFilters.includes('Urgent') && e.severity === 2) return true;
+      if (activeFilters.includes('Normal') && e.severity === 1) return true;
+      if (activeFilters.includes('Reported') && e.status === 'reported') return true;
+      return false;
+    });
   }, [events, activeFilters]);
 
   const refocus = () => {
-    if (adminLocation) {
-      mapRef.current?.flyTo({ center: [adminLocation.lng, adminLocation.lat], zoom: 16 });
-    }
+    // 🎯 แก้ไข: ให้บินกลับมาที่จุดเริ่มต้น พร้อมรีเซ็ตการหมุน (Bearing) และความเอียง (Pitch)
+    mapRef.current?.flyTo({
+      center: [100.6147, 14.0650],
+      zoom: 15,
+      bearing: 0, // หันหน้าไปทิศเหนือ
+      pitch: 0,   // มุมมองแบบแบนราบ
+      essential: true,
+      speed: 1.5
+    });
   };
 
   return (
@@ -74,27 +87,33 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
           mapStyle={`https://maps.geo.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/maps/v0/maps/${process.env.NEXT_PUBLIC_AWS_MAP_NAME}/style-descriptor?key=${process.env.NEXT_PUBLIC_AWS_MAP_API_KEY}`}
           style={{ width: '100%', height: '100%' }}
         >
-          {filteredEvents.map((event) => (
-            <Marker
-              key={event.id}
-              longitude={event.lng}
-              latitude={event.lat}
-              onClick={e => {
-                e.originalEvent.stopPropagation();
-                setSelectedIncident(event);
-                console.log("Clicked Case:", event.id);
-              }}
-            >
-              <div className="relative cursor-pointer group">
-                {(event.severity >= 2 && event.status !== 'resolved') && (
-                  <div className={`absolute inset-0 rounded-full animate-ping opacity-30 ${event.severity === 3 ? 'bg-red-500' : 'bg-orange-500'}`}></div>
-                )}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-transform group-hover:scale-110 ${getSeverityColor(event)}`}>
-                  {getSeverityIcon(event)}
+          {filteredEvents.map((event) => {
+            // 🎯 เพิ่มการเช็ค: ถ้าพิกัดเป็น NaN ให้ข้ามจุดนี้ไปเลย แผนที่จะได้ไม่พัง
+            if (isNaN(event.lat) || isNaN(event.lng)) return null;
+
+            return (
+              <Marker
+                key={event.id}
+                longitude={event.lng}
+                latitude={event.lat}
+                onClick={e => {
+                  e.originalEvent.stopPropagation();
+                  setSelectedIncident(event);
+                  if (onMarkerClick) onMarkerClick(event); // ✅ แจ้งกลับไปที่ DashboardView
+                  console.log("Clicked Case:", event.id);
+                }}
+              >
+                <div className="relative cursor-pointer group">
+                  {(event.severity >= 2 && event.status !== 'resolved') && (
+                    <div className={`absolute inset-0 rounded-full animate-ping opacity-30 ${event.severity === 3 ? 'bg-red-500' : 'bg-orange-500'}`}></div>
+                  )}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-transform group-hover:scale-110 ${getSeverityColor(event)}`}>
+                    {getSeverityIcon(event)}
+                  </div>
                 </div>
-              </div>
-            </Marker>
-          ))}
+              </Marker>
+            );
+          })}
 
           {adminLocation && (
             <Marker longitude={adminLocation.lng} latitude={adminLocation.lat}>
@@ -106,9 +125,9 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
           )}
         </Map>
 
-        {/* UI Overlay: Filters (โค้ดเดิมของนาย) */}
+        {/* UI Overlay: Filters */}
         <div className="absolute top-6 left-6 flex flex-wrap gap-2 max-w-md">
-          {['Emergency', 'Urgent', 'Normal', 'Unset', 'Resolved'].map(label => (
+          {['Emergency', 'Urgent', 'Normal', 'Reported'].map(label => (
             <button
               key={label}
               onClick={() => toggleFilter(label)}
@@ -136,21 +155,6 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
         </button>
       </div>
 
-      {/* [เพิ่ม] แสดง Sidebar รายละเอียดถ้ามีการเลือกหมุด (ทำโครงไว้รอเพื่อน) */}
-      {selectedIncident && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-white p-4 rounded-xl shadow-2xl border border-slate-200 z-50 flex justify-between items-center animate-in slide-in-from-bottom-5">
-          <div>
-            <h4 className="font-bold text-slate-900 text-sm">Case ID: {selectedIncident.id}</h4>
-            <p className="text-xs text-slate-500 truncate max-w-[200px]">{selectedIncident.type}</p>
-          </div>
-          <button
-            onClick={() => setSelectedIncident(null)}
-            className="text-xs font-bold text-blue-600 hover:text-blue-800"
-          >
-            CLOSE
-          </button>
-        </div>
-      )}
     </div>
   );
 });
@@ -163,7 +167,7 @@ export default IncidentMap;
 // Helper Functions ของนาย (คงเดิมทั้งหมด)
 function getSeverityColor(event: IncidentEvent) {
   if (event.status === 'resolved') return 'bg-blue-600';
-  if (event.status === 'pending') return 'bg-slate-800';
+  if (event.status === 'reported') return 'bg-slate-800';
   switch (event.severity) {
     case 3: return 'bg-red-600';
     case 2: return 'bg-orange-500';
@@ -175,7 +179,7 @@ function getSeverityColor(event: IncidentEvent) {
 function getSeverityIcon(event: IncidentEvent) {
   const iconProps = { size: 14, color: "white", strokeWidth: 3 };
   if (event.status === 'resolved') return <CheckCircle2 {...iconProps} />;
-  if (event.status === 'pending') return <HelpCircle {...iconProps} />;
+  if (event.status === 'reported') return <HelpCircle {...iconProps} />;
   switch (event.severity) {
     case 3: return <Flame {...iconProps} />;
     case 2: return <AlertTriangle {...iconProps} />;

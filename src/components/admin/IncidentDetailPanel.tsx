@@ -1,135 +1,163 @@
-// src/components/admin/IncidentMap.tsx
+// src/components/admin/IncidentDetailPanel.tsx
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import Map, { Marker, NavigationControl, MapRef } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { User } from '@/types/auth';
-import { Flame, AlertTriangle, Info, HelpCircle, CheckCircle2, Crosshair } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, MapPin, Clock, AlertCircle, Shield, Loader2, Send, Hammer } from 'lucide-react';
 
-interface MapProps {
-  events: any[]; 
-  currentUser?: User;
-  onMarkerClick: (event: any) => void; 
+interface IncidentDetailPanelProps {
+  report: any;
+  onClose: () => void;
+  onUpdateStatus: (reportId: number, status: string, urgencyScore: number) => Promise<boolean>;
+  onUpdateSuccess: () => void;
 }
 
-export default function IncidentMap({ events, currentUser, onMarkerClick }: MapProps) {
-  const mapRef = useRef<MapRef>(null);
-  const [adminLocation, setAdminLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+export default function IncidentDetailPanel({ report, onClose, onUpdateStatus, onUpdateSuccess }: IncidentDetailPanelProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedScore, setSelectedScore] = useState<number | null>(null);
 
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setAdminLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      });
+  if (!report) return null;
+
+  // ตรวจสอบสถานะต่างๆ
+  const isReported = report.status === 'reported';
+  const isInProgress = report.status === 'in_progress';
+  const isResolved = report.status === 'resolved';
+
+  const handleSubmit = async () => {
+    if (selectedScore === null) return;
+    setIsUpdating(true);
+    const success = await onUpdateStatus(report.id, 'in_progress', selectedScore);
+    if (success) {
+      onUpdateSuccess();
     }
-  }, []);
-
-  const toggleFilter = (label: string) => {
-    setActiveFilters(prev => prev.includes(label) ? prev.filter(f => f !== label) : [...prev, label]);
+    setIsUpdating(false);
   };
 
-  const filteredEvents = useMemo(() => {
-    if (activeFilters.length === 0) return events;
-    return events.filter(e => activeFilters.includes(e.type) || (activeFilters.includes('Unset') && e.status === 'pending'));
-  }, [events, activeFilters]);
-
-  const refocus = () => {
-    if (adminLocation) {
-      mapRef.current?.flyTo({ center: [adminLocation.lng, adminLocation.lat], zoom: 16 });
-    }
-  };
+  const urgencyOptions = [
+    { label: 'Normal', score: 1, color: 'bg-amber-400', hover: 'hover:bg-amber-500' },
+    { label: 'Urgent', score: 2, color: 'bg-orange-500', hover: 'hover:bg-orange-600' },
+    { label: 'Emergency', score: 3, color: 'bg-red-600', hover: 'hover:bg-red-700' },
+  ];
 
   return (
-    <div className="w-full h-full relative flex">
-      <div className="flex-1 relative">
-        <Map
-          ref={mapRef}
-          initialViewState={{ longitude: 100.6147, latitude: 14.0650, zoom: 15 }}
-          mapStyle={`https://maps.geo.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/maps/v0/maps/${process.env.NEXT_PUBLIC_AWS_MAP_NAME}/style-descriptor?key=${process.env.NEXT_PUBLIC_AWS_MAP_API_KEY}`}
-          style={{ width: '100%', height: '100%' }}
-        >
-          {filteredEvents.map((event) => (
-            <Marker 
-              key={event.id} 
-              longitude={event.lng} 
-              latitude={event.lat}
-              onClick={e => {
-                e.originalEvent.stopPropagation();
-                onMarkerClick(event); // ✅ 2. พอกดปุ๊บ ส่งข้อมูลกลับไปให้หน้า DashboardView ทันที
-              }}
-            >
-              <div className="relative cursor-pointer group z-10">
-                {(event.severity >= 2 && event.status !== 'resolved') && (
-                  <div className={`absolute inset-0 rounded-full animate-ping opacity-30 ${event.severity === 3 ? 'bg-red-500' : 'bg-orange-500'}`}></div>
-                )}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-transform group-hover:scale-110 ${getSeverityColor(event)}`}>
-                  {getSeverityIcon(event)}
-                </div>
-              </div>
-            </Marker>
-          ))}
+    <div className="absolute right-0 top-0 h-full w-[400px] bg-white shadow-2xl z-[100] border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-300 font-sans">
 
-          {adminLocation && (
-            <Marker longitude={adminLocation.lng} latitude={adminLocation.lat}>
-              <div className="relative flex items-center justify-center">
-                <div className="absolute w-10 h-10 bg-blue-500/20 rounded-full animate-pulse"></div>
-                <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-xl"></div>
-              </div>
-            </Marker>
-          )}
-        </Map>
+      {/* Header */}
+      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Case Investigation</h2>
+          <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mt-0.5">ID: {report.id}</p>
+        </div>
+        <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+          <X size={20} className="text-slate-500" />
+        </button>
+      </div>
 
-        {/* UI Overlay: Filters */}
-        <div className="absolute top-6 left-6 flex flex-wrap gap-2 max-w-md">
-          {['Emergency', 'Urgent', 'Normal', 'Unset', 'Resolved'].map(label => (
-            <button
-              key={label}
-              onClick={() => toggleFilter(label)}
-              className={`px-4 py-2 rounded-full text-[10px] font-bold tracking-widest transition-all ${
-                activeFilters.includes(label) ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 text-slate-400 hover:text-slate-900 backdrop-blur-md shadow-sm'
-              }`}
-            >
-              {label.toUpperCase()}
-            </button>
-          ))}
-          {activeFilters.length > 0 && (
-            <button onClick={() => setActiveFilters([])} className="px-4 py-2 rounded-full text-[10px] font-bold tracking-widest bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-              CLEAR
-            </button>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+        {/* Current Status & Urgency Badge */}
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isResolved ? 'bg-emerald-100 text-emerald-600' :
+              isInProgress ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'
+            }`}>
+            STATUS: {report.status.toUpperCase()}
+          </span>
+
+          {/* 🎯 แสดงระดับความรุนแรงเฉพาะค่า 1, 2, 3 */}
+          {[1, 2, 3].includes(report.severity) && (
+            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${report.severity === 3 ? 'bg-red-100 text-red-600' :
+                report.severity === 2 ? 'bg-orange-100 text-orange-600' : 'bg-amber-100 text-amber-600'
+              }`}>
+              {report.severity === 3 ? 'EMERGENCY' :
+                report.severity === 2 ? 'URGENT' : 'NORMAL'}
+            </span>
           )}
         </div>
 
-        {/* Refocus Button */}
-        <button onClick={refocus} className="absolute bottom-10 right-6 w-12 h-12 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-slate-100 flex items-center justify-center text-slate-700 hover:text-blue-600 transition-all active:scale-95">
-          <Crosshair size={20} strokeWidth={2.5} />
-        </button>
+        {/* Title & Description */}
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold text-slate-900 leading-tight">{report.title}</h3>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            {report.description || "No description provided."}
+          </p>
+        </div>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 gap-4 py-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-500"><MapPin size={18} /></div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Location</p>
+              <p className="text-sm text-slate-700 font-medium">{report.address}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{report.lat.toFixed(4)}, {report.lng.toFixed(4)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Evidence Image */}
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase mb-3">Evidence Photo</p>
+          <div className="aspect-video w-full bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+            {report.image_url || report.evidence_url ? (
+              <img src={report.image_url || report.evidence_url} alt="Evidence" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                <AlertCircle size={24} />
+                <span className="text-[10px] font-bold uppercase">No Image Attached</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 🎯 [NEW] Urgency Selection - แสดงเฉพาะตอนที่เป็น reported เท่านั้น */}
+        {isReported && (
+          <div className="pt-4 border-t border-slate-100 animate-in fade-in duration-500">
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-widest">Select Urgency Level</p>
+            <div className="grid grid-cols-3 gap-2">
+              {urgencyOptions.map((opt) => (
+                <button
+                  key={opt.score}
+                  onClick={() => setSelectedScore(opt.score)}
+                  className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 transition-all gap-1 ${selectedScore === opt.score
+                      ? `border-slate-900 shadow-md ${opt.color} text-white`
+                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:text-slate-600'
+                    }`}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-tighter">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Footer Actions */}
+      <div className="p-6 border-t border-slate-100 bg-slate-50/50">
+        {isReported ? (
+          // ปุ่มสำหรับเคสใหม่
+          <button
+            onClick={handleSubmit}
+            disabled={isUpdating || selectedScore === null}
+            className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl font-bold text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            {isUpdating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            {isUpdating ? "PROCESSING..." : "SUBMIT & START PROCESS"}
+          </button>
+        ) : isInProgress ? (
+          // ปุ่มสำหรับเคสที่กำลังทำ
+          <div className="w-full py-4 bg-blue-50 text-blue-600 rounded-2xl font-bold text-sm border border-blue-100 flex items-center justify-center gap-2">
+            <Hammer size={18} className="animate-bounce" />
+            กำลังดำเนินการแก้ไข
+          </div>
+        ) : (
+          // เคสที่เสร็จแล้ว
+          <div className="w-full py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-bold text-sm border border-emerald-100 flex items-center justify-center gap-2">
+            <Shield size={18} />
+            แก้ไขเรียบร้อยแล้ว
+          </div>
+        )}
+      </div>
+
     </div>
   );
-}
-
-// Helpers
-function getSeverityColor(event: any) {
-  if (event.status === 'resolved') return 'bg-blue-600';
-  if (event.status === 'pending') return 'bg-slate-800';
-  switch(event.severity) {
-    case 3: return 'bg-red-600';
-    case 2: return 'bg-orange-500';
-    case 1: return 'bg-amber-400';
-    default: return 'bg-slate-400';
-  }
-}
-
-function getSeverityIcon(event: any) {
-  const iconProps = { size: 14, color: "white", strokeWidth: 3 };
-  if (event.status === 'resolved') return <CheckCircle2 {...iconProps} />;
-  if (event.status === 'pending') return <HelpCircle {...iconProps} />;
-  switch(event.severity) {
-    case 3: return <Flame {...iconProps} />;
-    case 2: return <AlertTriangle {...iconProps} />;
-    case 1: return <Info {...iconProps} />;
-    default: return <HelpCircle {...iconProps} />;
-  }
 }
