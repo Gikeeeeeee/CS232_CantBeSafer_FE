@@ -13,7 +13,7 @@ export default function MapComponent({ points }: { points: any[] }) {
     // 1. สร้างแผนที่
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: `https://maps.geo.us-east-1.amazonaws.com/maps/v0/maps/Your_Map_Name/style-descriptor?key=Your_API_Key`,
+      style: `https://maps.geo.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/maps/v0/maps/${process.env.NEXT_PUBLIC_AWS_MAP_NAME}/style-descriptor?key=${process.env.NEXT_PUBLIC_AWS_MAP_API_KEY}`,
       center: [100.6025, 14.0722], // เริ่มต้นที่ มธ. รังสิต
       zoom: 13
     });
