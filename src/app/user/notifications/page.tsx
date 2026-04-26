@@ -3,15 +3,29 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Mail, BellRing, Info } from 'lucide-react';
+import { api } from '@/lib/axios';
 
 export default function NotificationsPage() {
   const [email, setEmail] = useState('loma.linux@example.com');
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubscribe = async () => {
-    // โค้ดส่วนยิง API (จำลอง)
-    alert(`ระบบได้ส่งคำขอยืนยันไปที่ ${email} แล้ว!\nกรุณาตรวจสอบ Email และกด 'Confirm Subscription'`);
-    setIsSubscribed(true);
+    setIsLoading(true);
+    try {
+      // 🚀 ยิง API จริงไปที่ Backend
+      const response = await api.post('/api/test/subscribe', { email });
+      
+      if (response.status === 200 || response.status === 201) {
+        alert(`ระบบได้ส่งคำขอยืนยันไปที่ ${email} แล้ว!\nกรุณาตรวจสอบ Email และกด 'Confirm Subscription' ในกล่องข้อความของคุณ`);
+        setIsSubscribed(true);
+      }
+    } catch (error: any) {
+      console.error("Subscription Error:", error);
+      alert(error.response?.data?.message || "เกิดข้อผิดพลาดในการส่งคำขอสมัครรับการแจ้งเตือน");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -71,13 +85,15 @@ export default function NotificationsPage() {
             {/* Subscribe Button */}
             <button
               onClick={handleSubscribe}
+              disabled={isLoading}
               className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-all active:scale-95 flex justify-center items-center gap-2 mt-4 ${
                 isSubscribed 
-                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' 
-                  : 'bg-slate-900 hover:bg-slate-800 shadow-slate-200'
-              }`}
+                ? 'bg-emerald-500 hover:bg-emerald-600' 
+                : 'bg-purple-600 hover:bg-purple-700'
+              } ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              {isSubscribed ? '✅ ส่งคำขอยืนยันเรียบร้อยแล้ว' : 'สมัครรับแจ้งเตือน (Subscribe)'}
+              <BellRing className={`w-5 h-5 ${isLoading ? 'animate-bounce' : ''}`} />
+              {isLoading ? 'กำลังส่ง...' : (isSubscribed ? 'Subscribed Success!' : 'Subscribe Now')}
             </button>
             
           </div>
