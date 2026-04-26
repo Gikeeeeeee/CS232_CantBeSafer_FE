@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/auth-store';
 import Button from '@/components/Button';
+import { jwtDecode } from 'jwt-decode';
 
 const LoginPage: React.FC = () => {
   const router = useRouter();
   const { login } = useAuthStore();
-  
+
   const [Username, setUsername] = useState<string>('');
   const [Password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -23,31 +24,40 @@ const LoginPage: React.FC = () => {
 
     try {
       const payload = { username: Username, password: Password };
+      // 🚀 ยิง API จริง
       const response = await loginService.postLogin(payload);
-      
-      const { token, role, user } = response.data; 
 
-      if (token && role) {
-        // --- 1. ต้องมีก้อนนี้ เพื่อไม่ให้ TypeScript ด่าว่า userData ไม่มีอยู่จริง ---
-        const userData = user || { 
-          user_id: 0, 
-          name: Username, 
-          role: role, 
-          dome_mail: '', 
-          is_active: true 
+      // ดึง token ตามโครงสร้าง response.data.token
+      const token = response.data?.token;
+
+      if (token) {
+        const decoded: any = jwtDecode(token);
+        const userRole = decoded.role || decoded.Role || response.data.user?.role || 'user';
+
+        const userData = {
+          user_id: decoded.id || 0,
+          name: Username,
+          role: userRole,
+          dome_mail: decoded.email || '',
+          is_active: true
         };
-        
+
         login(userData, token);
 
-        if (role === 'admin') {
-          router.push('/admin/dashboard');
+        // 🎯 สั่ง Store เก็บลง Cookie และ LocalStorage (Zustand จัดการให้)
+        login(userData, token);
+
+        // Hard Refresh เพื่อให้ Middleware ทำงานใหม่
+        if (userRole === 'admin') {
+          window.location.href = '/admin/dashboard';
         } else {
-          // เช็ค Path ให้ตรงกับ Folder ในรูปของคุณ คือ /user/profile
-          router.push('/user/profile'); 
+          window.location.href = '/user/home';
         }
+      } else {
+        setError("ไม่ได้รับ Token จากเซิร์ฟเวอร์");
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid username or password');
+      setError(err.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     } finally {
       setIsLoading(false);
     }
@@ -89,15 +99,11 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="pt-4 space-y-3">
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="space-y-6"
-            >
+            <Button type="submit" disabled={isLoading} className="space-y-6">
               {isLoading ? 'Checking...' : 'Login'}
             </Button>
             <Link href="/auth/signup" className="block text-center w-full bg-white border border-gray-200 text-gray-800 font-medium py-3 rounded-lg">
-                Sign up
+              Sign up
             </Link>
           </div>
         </form>
