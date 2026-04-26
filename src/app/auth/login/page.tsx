@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/auth-store';
 import Button from '@/components/Button';
+import { jwtDecode } from 'jwt-decode';
 
 const LoginPage: React.FC = () => {
   const router = useRouter();
@@ -16,7 +17,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
@@ -24,34 +25,59 @@ const LoginPage: React.FC = () => {
     try {
       const payload = { username: Username, password: Password };
       const response = await loginService.postLogin(payload);
-      
-      const { token, role, user } = response.data; 
+      const { token } = response.data;
 
-      if (token && role) {
-        // --- 1. ต้องมีก้อนนี้ เพื่อไม่ให้ TypeScript ด่าว่า userData ไม่มีอยู่จริง ---
-        const userData = user || { 
-          user_id: 0, 
-          name: Username, 
-          role: role, 
-          dome_mail: '', 
-          is_active: true 
-        };
+      console.log("Sending Payload:", payload);
+
+      if (token) {
+        console.log("1. Token received");
         
-        login(userData, token);
+        const decoded: any = jwtDecode(token);
+        // ดึง Role จากที่ต่างๆ ตามที่คุณดักไว้
+        const userRole = decoded.role || decoded.Role || response.data.user?.role || 'user';
 
-        if (role === 'admin') {
-          router.push('/admin/dashboard');
+        // --- จุดที่ต้องเพิ่ม: เซ็ต Cookie ให้ Middleware เห็น ---
+        // เราเซ็ตผ่าน document.cookie (หรือใช้ library cookies-next ก็ได้)
+        // ต้องตั้งชื่อให้ตรงกับ Middleware คือ 'auth-token' และ 'user-role'
+        const cookieOptions = "path=/; max-age=86400; SameSite=Lax"; // 1 วัน
+        document.cookie = `auth-token=${token}; ${cookieOptions}`;
+        document.cookie = `user-role=${userRole}; ${cookieOptions}`;
+
+        const userData = {
+          user_id: decoded.id || 0,
+          name: Username,
+          role: userRole,
+          dome_mail: decoded.email || '',
+          is_active: true
+        };
+
+        console.log("2. Data prepared, calling login store");
+        login(userData, token); // เซ็ตลง Zustand สำหรับใช้ใน UI
+
+        console.log("3. Redirecting to:", userRole);
+
+        // ใช้ window.location.href เพื่อให้ Middleware ทำงานใหม่ทั้งหมดจากการ Hard Refresh
+        if (userRole === 'admin') {
+          window.location.href = '/admin/dashboard';
         } else {
-          // เช็ค Path ให้ตรงกับ Folder ในรูปของคุณ คือ /user/profile
-          router.push('/user/profile'); 
+          window.location.href = '/user/profile';
         }
+      } else {
+        setError("No token received from server");
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid username or password');
+      console.error("Login Error Detailed:", err);
+      
+      // ปรับการแสดง Error ให้สื่อสารกับเราง่ายขึ้น
+      if (err.response?.status === 500) {
+        setError("Backend DB Error (500) - ลองใช้ User: admin / Pass: 1234 (Mock)");
+      } else {
+        setError(err.response?.data?.message || 'การเชื่อมต่อล้มเหลว');
+      }
     } finally {
       setIsLoading(false);
     }
-  }; // ปิด handleLogin
+  };
 
   return (
     <div className="min-h-screen bg-[#FFFFFF] flex items-center justify-center p-6">

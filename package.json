@@ -17,12 +17,10 @@
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-map-gl": "^8.1.1",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/maplibre-gl": "^1.13.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
