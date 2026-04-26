@@ -17,7 +17,9 @@ interface MapProps {
 const IncidentMap = forwardRef((props: MapProps, ref) => {
   const { events, currentUser } = props;
   const mapRef = useRef<MapRef>(null);
-  const [adminLocation, setAdminLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [adminLocation, setAdminLocation] = useState<{ lat: number, lng: number } | null>(null);
+
+
   const [selectedIncident, setSelectedIncident] = useState<IncidentEvent | null>(null);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
@@ -47,7 +49,7 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
   }, []);
 
   const toggleFilter = (label: string) => {
-    setActiveFilters(prev => 
+    setActiveFilters(prev =>
       prev.includes(label) ? prev.filter(f => f !== label) : [...prev, label]
     );
   };
@@ -73,14 +75,14 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
           style={{ width: '100%', height: '100%' }}
         >
           {filteredEvents.map((event) => (
-            <Marker 
-              key={event.id} 
-              longitude={event.lng} 
+            <Marker
+              key={event.id}
+              longitude={event.lng}
               latitude={event.lat}
               onClick={e => {
                 e.originalEvent.stopPropagation();
                 setSelectedIncident(event);
-                console.log("Clicked Case:", event.id); 
+                console.log("Clicked Case:", event.id);
               }}
             >
               <div className="relative cursor-pointer group">
@@ -110,15 +112,14 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
             <button
               key={label}
               onClick={() => toggleFilter(label)}
-              className={`px-4 py-2 rounded-full text-[10px] font-bold tracking-widest transition-all ${
-                activeFilters.includes(label) ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 text-slate-400 hover:text-slate-900 backdrop-blur-md shadow-sm'
-              }`}
+              className={`px-4 py-2 rounded-full text-[10px] font-bold tracking-widest transition-all ${activeFilters.includes(label) ? 'bg-slate-900 text-white shadow-lg' : 'bg-white/90 text-slate-400 hover:text-slate-900 backdrop-blur-md shadow-sm'
+                }`}
             >
               {label.toUpperCase()}
             </button>
           ))}
           {activeFilters.length > 0 && (
-            <button 
+            <button
               onClick={() => setActiveFilters([])}
               className="px-4 py-2 rounded-full text-[10px] font-bold tracking-widest bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
             >
@@ -127,7 +128,7 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
           )}
         </div>
 
-        <button 
+        <button
           onClick={refocus}
           className="absolute bottom-10 right-6 w-12 h-12 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-slate-100 flex items-center justify-center text-slate-700 hover:text-blue-600 hover:bg-white transition-all active:scale-95"
         >
@@ -137,18 +138,18 @@ const IncidentMap = forwardRef((props: MapProps, ref) => {
 
       {/* [เพิ่ม] แสดง Sidebar รายละเอียดถ้ามีการเลือกหมุด (ทำโครงไว้รอเพื่อน) */}
       {selectedIncident && (
-         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-white p-4 rounded-xl shadow-2xl border border-slate-200 z-50 flex justify-between items-center animate-in slide-in-from-bottom-5">
-            <div>
-               <h4 className="font-bold text-slate-900 text-sm">Case ID: {selectedIncident.id}</h4>
-               <p className="text-xs text-slate-500 truncate max-w-[200px]">{selectedIncident.type}</p>
-            </div>
-            <button 
-              onClick={() => setSelectedIncident(null)}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800"
-            >
-              CLOSE
-            </button>
-         </div>
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg bg-white p-4 rounded-xl shadow-2xl border border-slate-200 z-50 flex justify-between items-center animate-in slide-in-from-bottom-5">
+          <div>
+            <h4 className="font-bold text-slate-900 text-sm">Case ID: {selectedIncident.id}</h4>
+            <p className="text-xs text-slate-500 truncate max-w-[200px]">{selectedIncident.type}</p>
+          </div>
+          <button
+            onClick={() => setSelectedIncident(null)}
+            className="text-xs font-bold text-blue-600 hover:text-blue-800"
+          >
+            CLOSE
+          </button>
+        </div>
       )}
     </div>
   );
@@ -163,7 +164,7 @@ export default IncidentMap;
 function getSeverityColor(event: IncidentEvent) {
   if (event.status === 'resolved') return 'bg-blue-600';
   if (event.status === 'pending') return 'bg-slate-800';
-  switch(event.severity) {
+  switch (event.severity) {
     case 3: return 'bg-red-600';
     case 2: return 'bg-orange-500';
     case 1: return 'bg-amber-400';
@@ -175,7 +176,7 @@ function getSeverityIcon(event: IncidentEvent) {
   const iconProps = { size: 14, color: "white", strokeWidth: 3 };
   if (event.status === 'resolved') return <CheckCircle2 {...iconProps} />;
   if (event.status === 'pending') return <HelpCircle {...iconProps} />;
-  switch(event.severity) {
+  switch (event.severity) {
     case 3: return <Flame {...iconProps} />;
     case 2: return <AlertTriangle {...iconProps} />;
     case 1: return <Info {...iconProps} />;

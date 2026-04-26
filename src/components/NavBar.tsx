@@ -48,13 +48,13 @@ h-auto w-[70px] py-8 px-2 gap-6 rounded-[5rem]
         h-[60vh] max-h-[500px] min-h-[380px] w-[75px]
         py-10 px-2 rounded-[5rem]
       `}>
-        
+
         {/* My Account (อยู่บนสุดตามรูป iPad) */}
         <Link href="/user/profile" className={navItemClasses('/user/profile')}>
           <div className={`p-2 rounded-full transition-colors ${isActive('/user/profile') ? 'bg-gray-100' : ''}`}>
             <UserCircle className="w-8 h-8" />
           </div>
-          <span className="text-[11px] font-bold text-center">My<br/>account</span>
+          <span className="text-[11px] font-bold text-center">My<br />account</span>
         </Link>
 
         {/* Report (อยู่กลาง) */}

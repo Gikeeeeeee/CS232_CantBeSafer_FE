@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
-import { getIncidentMarkers } from "@/services/reportService";
+import { fetchActiveIncidentPoints } from "@/services/locationService";
 
 const MapView = () => {
   const [reportMarkers, setReportMarkers] = useState<any[]>([]);
@@ -13,7 +13,7 @@ const MapView = () => {
 
     const fetchMapData = async () => {
       try {
-        const responseData = await getIncidentMarkers();
+        const responseData = await fetchActiveIncidentPoints();
         setReportMarkers(responseData);
       } catch (err) {
         console.error("Fetch data error:", err);
@@ -23,10 +23,10 @@ const MapView = () => {
   }, []);
 
   const getMarkerColor = (urgencyScore: number, reportStatus: string) => {
-    if (reportStatus === "RESOLVED" || reportStatus === "resolved") return "#2563eb"; 
-    if (urgencyScore === 3) return "#9333ea"; 
-    if (urgencyScore === 2) return "#ff3b3b"; 
-    return "#ffb800";                          
+    if (reportStatus === "RESOLVED" || reportStatus === "resolved") return "#2563eb";
+    if (urgencyScore === 3) return "#9333ea";
+    if (urgencyScore === 2) return "#ff3b3b";
+    return "#ffb800";
   };
 
   const createMapIcon = (urgencyScore: number, reportStatus: string) => {
@@ -55,16 +55,16 @@ const MapView = () => {
         {reportMarkers.map((markerItem) => {
           const latitudeNum = parseFloat(markerItem.latitude);
           const longitudeNum = parseFloat(markerItem.longitude);
-          
+
           if (isNaN(latitudeNum) || isNaN(longitudeNum)) return null;
 
           const coordinates: [number, number] = [latitudeNum, longitudeNum];
-          
+
           const score = Number(markerItem.urgency_score);
           const displayColor = getMarkerColor(score, markerItem.status);
 
           let severityText = "NORMAL";
-          let severityClass = "text-amber-500"; 
+          let severityClass = "text-amber-500";
 
           if (score === 3) {
             severityText = "EMERGENCY";
@@ -92,13 +92,13 @@ const MapView = () => {
                     <h3 className="font-bold">{markerItem.title}</h3>
                     <p className="text-xs">{markerItem.description}</p>
                     <p className="text-[10px] text-gray-500 mt-1 flex items-center">
-                       ความรุนแรงระดับ: 
-                       <span className={`ml-1 font-bold ${severityClass}`}>
-                         {severityText}
-                       </span>
-                       {(markerItem.status === 'resolved' || markerItem.status === 'RESOLVED') && (
-                         <span className="text-blue-600 font-bold ml-1">(แก้ไขแล้ว)</span>
-                       )}
+                      ความรุนแรงระดับ:
+                      <span className={`ml-1 font-bold ${severityClass}`}>
+                        {severityText}
+                      </span>
+                      {(markerItem.status === 'resolved' || markerItem.status === 'RESOLVED') && (
+                        <span className="text-blue-600 font-bold ml-1">(แก้ไขแล้ว)</span>
+                      )}
                     </p>
                   </div>
                 </Popup>
