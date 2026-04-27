@@ -33,10 +33,12 @@ const ProfilePage = () => {
     };
 
     const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${displayUser.name}&backgroundColor=10b981`;
-    const joinedDate = new Date(displayUser.created_at).toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-    });
+    const joinedDate = displayUser.created_at 
+        ? new Date(displayUser.created_at).toLocaleDateString('en-US', {
+            month: 'long',
+            year: 'numeric'
+        })
+        : 'Unknown Date';
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24">

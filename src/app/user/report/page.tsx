@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { Camera, MapPin, Plus, User, ChevronLeft, PlusCircle, X, CheckCircle2 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth-store';
@@ -9,7 +9,7 @@ import Cookies from 'js-cookie';
 import Map, { Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-export default function ReportPage() {
+function ReportContent() {
   const { token: storeToken } = useAuthStore();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -234,3 +234,11 @@ export default function ReportPage() {
     </div>
   );
 }
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>}>
+      <ReportContent />
+    </Suspense>
+  );
+}

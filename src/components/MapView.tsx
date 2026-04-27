@@ -24,7 +24,7 @@ export default function MapView() {
     const fetchMapData = async () => {
       try {
         const responseData = await getIncidentMarkers();
-        const rawArray = Array.isArray(responseData) ? responseData : (responseData?.data || []);
+        const rawArray = Array.isArray(responseData) ? responseData : ((responseData as any)?.data || []);
 
         if (Array.isArray(rawArray) && rawArray.length > 0) {
           const formattedData = rawArray.map((item: any) => {
