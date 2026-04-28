@@ -3,71 +3,73 @@ import type { NextRequest } from 'next/server';
 import { jwtDecode } from 'jwt-decode';
 
 export function middleware(request: NextRequest) {
-  // 1. ดึง Token จาก Cookie (ชื่อต้องตรงกับที่เซ็ตตอน Login)
+  // 1. ดึง Token ดิบจาก Cookie (รหัส eyJhbG...)
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
-  // 2. กำหนด Path ที่เราอนุญาตให้เข้าได้โดยไม่ต้อง Login (Public Routes)
-  const isAuthPage = pathname.startsWith('/auth'); // เช่น /auth/login, /auth/register
-  const isPublicPage = pathname === '/'; // หน้าแรก (ถ้าอยากให้คนนอกดูได้)
+  console.log(`[Middleware] Path: ${pathname} | Has Token: ${!!token}`);
+
+  // 2. กำหนดกลุ่ม Path
+  const isAuthPage = pathname.startsWith('/auth'); // /auth/login, /auth/register
+  const isPublicPage = pathname === '/'; // หน้าแรก
 
   // --- LOGIC หลัก ---
 
-  // กรณีที่ 1: ถ้า "ไม่มี Token" และ "พยายามเข้าหน้าอื่นที่ไม่ใช่หน้า Auth"
-  // ให้ดีดไปหน้า Login ทันที
-  if (!token && !isAuthPage && !isPublicPage) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+  // กรณีที่ 1: ไม่มี Token และจะเข้าหน้าที่ต้อง Login
+  if (!token) {
+    if (!isAuthPage && !isPublicPage) {
+      return NextResponse.redirect(new URL('/auth/login', request.url));
+    }
+    return NextResponse.next();
   }
 
-  // กรณีที่ 2: ถ้า "มี Token แล้ว" แต่ยัง "พยายามจะไปหน้า Login/Register"
-  // ให้ดีดไปหน้า Dashboard หรือหน้าหลัก (เพราะ Login แล้วจะ Login ซ้ำทำไม)
-// กรณีที่ 2: มี Token แล้ว
-  if (token) {
-    let role = request.cookies.get('user-role')?.value;
+  // กรณีที่ 2: มี Token แล้ว
+  try {
+    // 🛑 สำคัญ: jwtDecode ใช้กับรหัสเพียวๆ เท่านั้น ถ้ามี Bearer นำหน้าต้องตัดออกก่อน
+    const rawToken = token.startsWith('Bearer ') ? token.split(' ')[1] : token;
+    const decoded: any = jwtDecode(rawToken);
 
-    // --- เพิ่มการ Decode ตรงนี้เพื่อความชัวร์ ---
-    try {
-      const decoded: any = jwtDecode(token);
-      role = decoded.role || decoded.Role || role; // เช็กทั้งตัวเล็กตัวใหญ่ หรือใช้จาก cookie สำรอง
-    } catch (error) {
-      // ถ้า decode พัง (Token ปลอม/หมดอายุ) ให้เตะออกไป login
-      console.error("JWT Decode Error:", error);
-      const response = NextResponse.redirect(new URL('/auth/login', request.url));
-      response.cookies.delete('auth-token');
-      return response;
-    }
+    // ดึง Role จาก Token (หรือจาก Cookie สำรองถ้าใน Token ไม่มี)
+    const role = decoded.role || decoded.Role || request.cookies.get('user-role')?.value;
 
-    // ถ้า Login แล้วแต่จะเข้าหน้า Auth (Login/Register) -> ดีดไปหน้าตาม Role
+    // A. ถ้า Login แล้วแต่จะไปหน้า Auth (Login/Register) -> ดีดออกไปหน้าตาม Role
     if (isAuthPage) {
-      if (role === 'admin') {
-        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-      }
-      return NextResponse.redirect(new URL('/user/profile', request.url));
+      const destination = role === 'admin' ? '/admin/dashboard' : '/user/home';
+      return NextResponse.redirect(new URL(destination, request.url));
     }
 
-    // --- (เพิ่มเติม) ระบบป้องกันการข้ามสายงาน (Role Protection) ---
-    // ถ้าเป็น Admin แต่พยายามเข้าหน้า /user
+    // B. ระบบป้องกันการข้ามสายงาน (Role Protection)
+    // เป็น Admin แต่จะเข้าหน้า User
     if (pathname.startsWith('/user') && role === 'admin') {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
     // ถ้าเป็น User แต่พยายามเข้าหน้า /admin
-    if (pathname.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL('/user/home', request.url));
+    if (pathname.startsWith('/admin') && role !== 'admin' && role !== 'dev') {
+      // เปลี่ยนจาก /user/home เป็นหน้าที่มีอยู่จริง (เช่น /user/profile)
+      return NextResponse.redirect(new URL('/user/profile', request.url));
     }
+
+  } catch (error) {
+    // ถ้า Token ปลอม, เละ, หรือ Decode ไม่ผ่าน -> ล้าง Cookie แล้วเตะไป Login
+    console.error("❌ Middleware Token Error:", error);
+    const response = NextResponse.redirect(new URL('/auth/login', request.url));
+    response.cookies.delete('auth-token');
+    response.cookies.delete('user-role');
+    return response;
   }
 
   return NextResponse.next();
 }
 
-// 3. กำหนดว่าจะให้ Middleware ตรวจสอบที่ไหนบ้าง (สำคัญมาก)
+// 3. กำหนดขอบเขตการทำงาน (Matcher)
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
+     * ตรวจสอบทุก Path ยกเว้น:
+     * - api (Next.js API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - favicon.ico
      */
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],

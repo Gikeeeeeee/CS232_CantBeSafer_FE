@@ -6,6 +6,7 @@ export interface User {
   dome_mail: string;
   role: Role;
   is_active: boolean;
+  created_at?: string;
 }
 
 export interface AuthState {

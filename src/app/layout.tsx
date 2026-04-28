@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; // เปลี่ยนเป็น Inter ที่ดู Formal กว่า
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { InAppNotification } from "@/components/InAppNotification";
 
-// ตั้งค่า Font Inter
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "My Application", // เปลี่ยนชื่อ App ให้ดูดีขึ้น
-  description: "Modern Dashboard Solution",
+  title: "CantBeSafer | Emergency Reporting System",
+  description: "Modern Safety and Incident Reporting Solution",
 };
 
 export default function RootLayout({
@@ -20,15 +20,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} h-full antialiased`}
-    >
-      <body 
-        className={`${inter.className} min-h-full flex flex-col bg-white text-gray-900`}
-        style={{ backgroundColor: '#FFFFFF' }} // ล็อคสีขาวล้วนแบบชัวร์ๆ
-      >
-        {children}
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <body className={`${inter.className} flex min-h-screen flex-col bg-slate-50 text-slate-900`}>
+        {/* ส่วนประกอบที่อยู่เหนือเนื้อหาทั้งหมด */}
+        <InAppNotification />
+
+        <div className="flex flex-1 flex-col">
+          {/* ส่วน Main Content */}
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </div>
+
+        {/* สามารถใส่ Footer หรือ Bottom Navigation ตรงนี้ได้ในอนาคต */}
       </body>
     </html>
   );
